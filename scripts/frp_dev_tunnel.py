@@ -95,6 +95,8 @@ def load_json_config() -> dict[str, Any]:
     path = config_path()
     if not path.exists():
         return {}
+    if not path.read_text(encoding="utf-8", errors="ignore").strip():
+        return {}
     try:
         with path.open("r", encoding="utf-8") as f:
             data = json.load(f)
@@ -680,6 +682,26 @@ def install_frpc(args: argparse.Namespace) -> None:
         print(f"持久添加 PATH: echo 'export PATH=\"{target.parent}:$PATH\"' >> {shell_rc}")
 
 
+def bootstrap_client(args: argparse.Namespace) -> None:
+    configure(args)
+
+    if not args.skip_install_frpc and not frpc_binary():
+        install_args = argparse.Namespace(
+            version=args.frp_version,
+            bin_dir=args.bin_dir,
+            force=False,
+        )
+        install_frpc(install_args)
+
+    if not args.skip_doctor:
+        check_environment(argparse.Namespace())
+
+    print("")
+    print("Next:")
+    print("  1. Start the local dev server on the target port.")
+    print(f"  2. Run: scripts/frp-dev-tunnel.sh start-auto {args.prefix} <local-port>")
+
+
 def check_environment(_: argparse.Namespace) -> None:
     failures: list[str] = []
     missing_install_packages: list[str] = []
@@ -897,9 +919,10 @@ def start_tunnel(args: argparse.Namespace) -> None:
     directory = work_dir() / subdomain
     config_file = directory / "frpc.toml"
     log_file = directory / "frpc.log"
-    write_frpc_config(config, subdomain, local_port, local_ip, config_file)
 
     stop_tunnel_by_subdomain(subdomain, quiet=True)
+    write_frpc_config(config, subdomain, local_port, local_ip, config_file)
+
     if runner == "local":
         start_local_frpc(subdomain, config_file, log_file)
     else:
@@ -982,6 +1005,20 @@ def logs_tunnel(args: argparse.Namespace) -> None:
     print(redact_text(logs.stdout + logs.stderr), end="")
 
 
+def print_verify_hint(status: int, body: str, config: dict[str, Any]) -> None:
+    lowered = body.lower()
+    if status == 403 and ("allowedhosts" in lowered or "blocked request" in lowered):
+        domain = config.get("public_domain") or "<public-domain>"
+        print("")
+        print("Hint: the request reached the local dev server, but the Host header was rejected.")
+        print("For Vite, add a narrow allowedHosts rule, for example:")
+        print(f"  server: {{ allowedHosts: ['.{domain}'] }}")
+    elif status in {502, 503, 504}:
+        print("")
+        print("Hint: the public gateway answered, but it could not reach the local service.")
+        print("Check that the local dev server is running on the same port used by start/start-auto.")
+
+
 def verify_tunnel(args: argparse.Namespace) -> None:
     validate_subdomain(args.subdomain)
     config = ensure_config(merge_config(), allow_prompt=False)
@@ -1001,6 +1038,8 @@ def verify_tunnel(args: argparse.Namespace) -> None:
         print(f"HTTP {exc.code} {exc.reason}")
         for key, value in exc.headers.items():
             print(f"{key}: {value}")
+        body = exc.read(2048).decode("utf-8", errors="replace")
+        print_verify_hint(exc.code, body, config)
     except Exception as exc:
         die(f"验证失败: {exc}")
 
@@ -1107,6 +1146,20 @@ def build_parser() -> argparse.ArgumentParser:
     config.add_argument("--public-scheme", dest="public_scheme", choices=["http", "https"], help="Public URL scheme printed by start/verify.")
     config.add_argument("--no-prompt", action="store_true", help="Fail instead of prompting for missing values.")
     config.set_defaults(func=configure)
+
+    bootstrap = subparsers.add_parser("bootstrap", help="Configure this client, install frpc if needed, and run doctor.")
+    bootstrap.add_argument("--server-addr", dest="server_addr", required=True, help="FRPS serverAddr domain or IP. May include :port.")
+    bootstrap.add_argument("--server-port", dest="server_port", required=True, help="FRPS serverPort.")
+    bootstrap.add_argument("--token", dest="auth_token", required=True, help="FRPS auth token.")
+    bootstrap.add_argument("--public-domain", dest="public_domain", required=True, help="Wildcard/subdomain host used for printed URLs.")
+    bootstrap.add_argument("--public-scheme", dest="public_scheme", choices=["http", "https"], default="http", help="Public URL scheme printed by start/verify.")
+    bootstrap.add_argument("--frp-version", default=DEFAULT_FRP_VERSION, help=f"frp release version for install-frpc. Default: {DEFAULT_FRP_VERSION}.")
+    bootstrap.add_argument("--bin-dir", help="Install directory for frpc. Default: FRP_TUNNEL_BIN_DIR or user-local bin.")
+    bootstrap.add_argument("--prefix", default="demo", help="Suggested start-auto prefix printed at the end.")
+    bootstrap.add_argument("--skip-install-frpc", action="store_true", help="Do not install frpc even when missing.")
+    bootstrap.add_argument("--skip-doctor", action="store_true", help="Do not run doctor after config/install.")
+    bootstrap.add_argument("--no-prompt", action="store_true", default=True, help=argparse.SUPPRESS)
+    bootstrap.set_defaults(func=bootstrap_client)
 
     show = subparsers.add_parser("show-config", help="Print the effective config with secrets redacted.")
     show.set_defaults(func=show_config)

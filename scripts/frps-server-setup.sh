@@ -2,7 +2,6 @@
 set -Eeuo pipefail
 
 APP_NAME="gt-frp-dev-tunnel"
-REPO_URL="https://github.com/Leochens/gt-frp-dev-tunnel"
 DEFAULT_FRP_VERSION="0.67.0"
 
 FRP_DIR="/opt/frp"
@@ -727,6 +726,15 @@ port_check_command() {
   printf "curl -fsSL https://raw.githubusercontent.com/Leochens/gt-frp-dev-tunnel/main/scripts/frps-server-setup.sh | bash -s -- check-port --host %q --port %q" "${host}" "${port}"
 }
 
+client_bootstrap_command() {
+  printf "curl -fsSL https://raw.githubusercontent.com/Leochens/gt-frp-dev-tunnel/main/scripts/frp-client-bootstrap.sh | bash -s -- --server-addr %q --server-port %q --token %q --public-domain %q --public-scheme %q" \
+    "${SERVER_ADDR}" \
+    "${SERVER_PORT}" \
+    "${AUTH_TOKEN}" \
+    "${DOMAIN}" \
+    "${PUBLIC_SCHEME}"
+}
+
 print_firewall_guide() {
   log ""
   log "服务器厂商防火墙 / 安全组"
@@ -749,40 +757,24 @@ write_client_prompt() {
 请把下面这段话复制给你本地开发环境里的 Agent / 子 Agent：
 
 ---
-请先检查并安装这个开源项目提供的 skill / helper：
-${REPO_URL}
+服务端已经准备好。下面的命令包含 FRPS token，只发送给可信的本地开发 Agent。
 
-如果当前 Agent 平台支持 skill、plugin 或 connector，请从这个仓库安装名为 gt-frp-dev-tunnel 的能力，并阅读仓库里的使用说明后再继续。
-如果当前 Agent 平台不支持 skill 机制，请 clone 或下载这个仓库，并直接使用仓库里的 scripts/frp-dev-tunnel.sh 作为本地 helper。
-
-服务端已经准备好，客户端参数如下：
-
-FRP_SERVER_ADDR=${SERVER_ADDR}
-FRP_SERVER_PORT=${SERVER_PORT}
-FRP_DEV_DOMAIN=${DOMAIN}
-FRP_PUBLIC_SCHEME=${PUBLIC_SCHEME}
-FRP_AUTH_TOKEN=${AUTH_TOKEN}
-
-在继续配置客户端前，请先确认服务器厂商控制台的安全组/防火墙已经放行入站 TCP ${SERVER_PORT}。
+在配置客户端前，请先确认服务器厂商控制台的安全组/防火墙已经放行入站 TCP ${SERVER_PORT}。
 如果不确定，请从客户端电脑或任意外部机器运行：
 
 $(port_check_command "${SERVER_ADDR}" "${SERVER_PORT}")
 
 如果端口不通，请先去服务器厂商控制台放行 TCP ${SERVER_PORT}，开启后再次运行同一条 check-port 命令确认成功。
 
-安装/准备完成后，在客户端项目里执行：
+端口确认可达后，在本地项目根目录运行这一条命令。它会下载 helper、写入本机 FRP 配置、安装轻量 frpc（如缺失）并运行 doctor：
 
-scripts/frp-dev-tunnel.sh config \\
-  --server-addr ${SERVER_ADDR} \\
-  --server-port ${SERVER_PORT} \\
-  --token '${AUTH_TOKEN}' \\
-  --public-domain ${DOMAIN} \\
-  --public-scheme ${PUBLIC_SCHEME}
+$(client_bootstrap_command)
 
-然后按目标项目的本地端口启动临时隧道，例如：
+然后启动目标项目的本地 dev server，并按实际端口启动临时隧道，例如：
 
-scripts/frp-dev-tunnel.sh doctor
 scripts/frp-dev-tunnel.sh start-auto demo 5173
+
+如果外网访问 Vite 返回 403，请在目标项目的 Vite 配置里允许 .${DOMAIN} 这个 Host 后重启 dev server。
 ---
 EOF
 )"
@@ -817,9 +809,13 @@ preflight_prompts() {
   fi
 
   if [[ -z "${PUBLIC_SCHEME}" ]]; then
-    PUBLIC_SCHEME="https"
+    if [[ -n "${TLS_CERT}" && -n "${TLS_KEY}" ]]; then
+      PUBLIC_SCHEME="https"
+    else
+      PUBLIC_SCHEME="http"
+    fi
     if is_tty; then
-      PUBLIC_SCHEME="$(prompt_text "客户端公开 URL scheme。使用 CDN/HTTPS 网关选 https；只有 frps HTTP 直连选 http" "${PUBLIC_SCHEME}")"
+      PUBLIC_SCHEME="$(prompt_text "客户端公开 URL scheme。已有 CDN/HTTPS 泛域名证书选 https；否则选 http" "${PUBLIC_SCHEME}")"
     fi
   fi
 
@@ -904,8 +900,8 @@ setup() {
     esac
   fi
 
-  if [[ "${PUBLIC_SCHEME}" == "https" && -z "${TLS_CERT}" && ( "${http_busy}" == "1" || "${https_busy}" == "1" ) ]]; then
-    warn "当前未配置 TLS 证书路径；如果网关/CDN 没有 HTTPS 泛域名证书，请把客户端 public scheme 改成 http。"
+  if [[ "${PUBLIC_SCHEME}" == "https" && ( -z "${TLS_CERT}" || -z "${TLS_KEY}" ) ]]; then
+    warn "当前未提供 TLS 泛域名证书路径；请确认 CDN/网关已能处理 *.${DOMAIN} 的 HTTPS，否则客户端应使用 --public-scheme http。"
   fi
 
   print_dns_guide

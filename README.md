@@ -40,7 +40,7 @@ For production-like usage, prefer a tagged release URL instead of `main` after t
 curl -fsSL https://raw.githubusercontent.com/Leochens/gt-frp-dev-tunnel/v0.1.0/scripts/frps-server-setup.sh | sudo bash -s -- setup --domain tunnel.example.com
 ```
 
-The server script installs/configures `frps`, guides wildcard DNS setup, handles 80/443 conflicts with Nginx/OpenResty/Apache when possible, and prints a client-side prompt.
+The server script installs/configures `frps`, guides wildcard DNS setup, handles 80/443 conflicts with Nginx/OpenResty/Apache when possible, and prints a client-side bootstrap command.
 
 By default, the server runtime is `auto`:
 
@@ -78,17 +78,13 @@ If the check says the port is not reachable, open the port in the cloud firewall
 
 After the server setup finishes, copy the printed prompt to your local development Agent or sub-agent. The prompt is intentionally generic because the receiving Agent might be Codex, Claude Code, OpenCode, OpenCloud, or another coding assistant.
 
-The prompt tells the local Agent to:
+The prompt gives the local Agent a single bootstrap command like:
 
-1. Inspect and install/use this repository:
-
-```text
-https://github.com/Leochens/gt-frp-dev-tunnel
+```bash
+curl -fsSL https://raw.githubusercontent.com/Leochens/gt-frp-dev-tunnel/main/scripts/frp-client-bootstrap.sh | bash -s -- --server-addr tunnel.example.com --server-port 7111 --token '<token>' --public-domain tunnel.example.com --public-scheme http
 ```
 
-2. Configure the client helper with the generated FRPS parameters.
-3. Run `doctor`.
-4. Start a temporary tunnel for the local development port.
+That command downloads the helper into the current project, writes the local FRP config, installs the lightweight `frpc` client if missing, and runs `doctor`. It does not write the token into git-tracked project files.
 
 The same prompt is saved on the server at:
 
@@ -98,7 +94,7 @@ The same prompt is saved on the server at:
 
 ## Client Helper
 
-On the local development machine, after installing or cloning this repository:
+On the local development machine, the bootstrap command is preferred. If you already installed or cloned this repository:
 
 ```bash
 scripts/frp-dev-tunnel.sh doctor
@@ -109,6 +105,14 @@ scripts/frp-dev-tunnel.sh config \
   --public-domain <wildcard-domain> \
   --public-scheme <http-or-https>
 scripts/frp-dev-tunnel.sh start-auto demo 5173
+```
+
+If external Vite access returns a 403 mentioning `allowedHosts` or blocked Host, allow the wildcard host in the target project's Vite config and restart the dev server:
+
+```ts
+server: {
+  allowedHosts: ['.tunnel.example.com'],
+}
 ```
 
 Stop a tunnel:
