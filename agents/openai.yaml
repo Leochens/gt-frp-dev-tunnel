@@ -1,4 +1,4 @@
 interface:
   display_name: "GT FRP Dev Tunnel"
-  short_description: "Expose local dev servers through frp subdomains"
-  default_prompt: "Use $gt-frp-dev-tunnel to expose my local dev server through the configured frp subdomain tunnel for quick mobile testing."
+  short_description: "Expose dev servers through configurable frp tunnels"
+  default_prompt: "Use $gt-frp-dev-tunnel to check my environment, configure FRPS if needed, and expose my local dev server for mobile testing."
