@@ -29,6 +29,43 @@ The VPS/server side must already provide:
 
 Do not assume any fixed domain. If no config is present, ask the user for FRPS connection domain/IP, FRPS port, and token. If the public wildcard domain differs from the FRPS connection domain, also ask for or set `--public-domain`.
 
+## Server Bootstrap
+
+If the user does not already have an frps server, prepare a dedicated Linux VPS with the bundled server setup script. The server should ideally be used only as the FRP gateway.
+
+One-line server setup from the open-source repository:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Leochens/gt-frp-dev-tunnel/main/scripts/frps-server-setup.sh | sudo bash -s -- setup
+```
+
+With a known wildcard domain:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Leochens/gt-frp-dev-tunnel/main/scripts/frps-server-setup.sh | sudo bash -s -- setup --domain tunnel.example.com
+```
+
+The server script:
+
+- Installs `frps` and writes `/etc/frp/frps.toml`.
+- Generates or accepts the `auth.token`.
+- Lets the user choose the frps client connection port; the default is `7111`.
+- Defaults `vhostHTTPPort` to `80` and `vhostHTTPSPort` to `443`.
+- Detects 80/443 conflicts and, when possible, writes wildcard reverse-proxy config for Nginx/OpenResty or Apache.
+- Prints DNS guidance for `*.tunnel.example.com`.
+- Reminds the user to open the frps connection port in the cloud provider firewall/security group.
+- Prints a reusable external port check command:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Leochens/gt-frp-dev-tunnel/main/scripts/frps-server-setup.sh | bash -s -- check-port --host <frps-domain-or-ip> --port 7111
+```
+
+- Prints a client-side prompt that first tells the local Agent/sub-agent to inspect and install this skill/helper from `https://github.com/Leochens/gt-frp-dev-tunnel`, then gives the exact `scripts/frp-dev-tunnel.sh config ...` command.
+
+Do not rewrite that final prompt as Codex-only instructions. The receiving Agent may be Codex, Claude Code, OpenCode, OpenCloud, or another coding assistant, so keep the wording generic: "your local Agent / sub-agent".
+
+If the port check fails, tell the user to open inbound TCP `7111` or their chosen `--server-port` in the server provider's firewall/security group, then rerun the same `check-port` command from an external/client machine.
+
 ## Environment First
 
 Run the bundled environment check before starting a tunnel:
@@ -93,6 +130,17 @@ scripts/frp-dev-tunnel.sh config \
   --public-domain <subdomain-host>
 ```
 
+If the server setup output includes a public URL scheme, preserve it:
+
+```bash
+scripts/frp-dev-tunnel.sh config \
+  --server-addr <frps-domain-or-ip> \
+  --server-port <frps-port> \
+  --token <frps-token> \
+  --public-domain <subdomain-host> \
+  --public-scheme <http-or-https>
+```
+
 Config precedence:
 
 1. `FRPC_SOURCE_CONFIG` parsed from an existing `frpc.toml`.
@@ -107,6 +155,7 @@ FRP_SERVER_ADDR=<frps-domain-or-ip>
 FRP_SERVER_PORT=<frps-port>
 FRP_AUTH_TOKEN=<frps-token>
 FRP_DEV_DOMAIN=<subdomain-host>
+FRP_PUBLIC_SCHEME=https
 FRPC_BIN=/path/to/frpc
 FRPC_SOURCE_CONFIG=/path/to/frpc.toml
 FRP_RUNNER=local

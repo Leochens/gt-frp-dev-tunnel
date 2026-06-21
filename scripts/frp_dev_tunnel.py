@@ -270,11 +270,12 @@ def merge_config(args: argparse.Namespace | None = None) -> dict[str, Any]:
         "server_port": env_first("FRP_SERVER_PORT", "FRPS_SERVER_PORT"),
         "auth_token": env_first("FRP_AUTH_TOKEN", "FRPS_TOKEN", "FRP_TOKEN"),
         "public_domain": env_first("FRP_DEV_DOMAIN", "FRP_PUBLIC_DOMAIN"),
+        "public_scheme": env_first("FRP_PUBLIC_SCHEME", "FRP_DEV_SCHEME"),
     }
     config.update({k: v for k, v in env_config.items() if v})
 
     if args:
-        for key in ("server_addr", "server_port", "auth_token", "public_domain"):
+        for key in ("server_addr", "server_port", "auth_token", "public_domain", "public_scheme"):
             value = getattr(args, key, None)
             if value:
                 config[key] = value
@@ -288,6 +289,11 @@ def merge_config(args: argparse.Namespace | None = None) -> dict[str, Any]:
         config["public_domain"] = normalize_domain(str(config["public_domain"]))
     if config.get("server_port"):
         config["server_port"] = validate_port(config["server_port"], "FRPS 端口")
+    if config.get("public_scheme"):
+        public_scheme = str(config["public_scheme"]).lower()
+        if public_scheme not in {"http", "https"}:
+            die("public_scheme 只能是 http 或 https")
+        config["public_scheme"] = public_scheme
 
     return config
 
@@ -367,6 +373,10 @@ def redacted_config(config: dict[str, Any]) -> dict[str, Any]:
     if result.get("auth_token"):
         result["auth_token"] = "<redacted>"
     return result
+
+
+def public_scheme(config: dict[str, Any]) -> str:
+    return str(config.get("public_scheme") or "https")
 
 
 def toml_quote(value: str) -> str:
@@ -895,7 +905,7 @@ def start_tunnel(args: argparse.Namespace) -> None:
     else:
         start_docker_frpc(subdomain, config_file)
 
-    print(f"https://{subdomain}.{config['public_domain']}/")
+    print(f"{public_scheme(config)}://{subdomain}.{config['public_domain']}/")
 
 
 def start_auto_tunnel(args: argparse.Namespace) -> None:
@@ -976,12 +986,11 @@ def verify_tunnel(args: argparse.Namespace) -> None:
     validate_subdomain(args.subdomain)
     config = ensure_config(merge_config(), allow_prompt=False)
     path = args.path if args.path.startswith("/") else f"/{args.path}"
-    url = f"https://{args.subdomain}.{config['public_domain']}{path}"
+    url = f"{public_scheme(config)}://{args.subdomain}.{config['public_domain']}{path}"
     request = urllib.request.Request(url, method="GET", headers={"Cache-Control": "no-cache"})
-    context = ssl._create_unverified_context()
     opener = urllib.request.build_opener(
         urllib.request.ProxyHandler({}),
-        urllib.request.HTTPSHandler(context=context),
+        urllib.request.HTTPSHandler(context=ssl._create_unverified_context()),
     )
     try:
         with opener.open(request, timeout=10) as response:
@@ -1032,6 +1041,8 @@ def configure(args: argparse.Namespace) -> None:
         config["public_domain"] = normalize_domain(args.public_domain)
     elif config.get("server_addr") and not config.get("public_domain"):
         config["public_domain"] = config["server_addr"]
+    if args.public_scheme:
+        config["public_scheme"] = args.public_scheme
 
     config = ensure_config(config, allow_prompt=not args.no_prompt)
     save_json_config(config)
@@ -1093,6 +1104,7 @@ def build_parser() -> argparse.ArgumentParser:
     config.add_argument("--server-port", dest="server_port", help="FRPS serverPort.")
     config.add_argument("--token", dest="auth_token", help="FRPS auth token.")
     config.add_argument("--public-domain", dest="public_domain", help="Wildcard/subdomain host used for printed URLs.")
+    config.add_argument("--public-scheme", dest="public_scheme", choices=["http", "https"], help="Public URL scheme printed by start/verify.")
     config.add_argument("--no-prompt", action="store_true", help="Fail instead of prompting for missing values.")
     config.set_defaults(func=configure)
 
