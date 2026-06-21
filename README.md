@@ -143,7 +143,7 @@ frp-dev-tunnel start-auto demo 5173
 frp-dev-tunnel list
 ```
 
-If external Vite access returns a 403 mentioning `allowedHosts` or blocked Host, the tunnel is reaching the local dev server. Ask before changing the target project, then allow the wildcard host in the target project's Vite config and restart the dev server:
+If external Vite access returns a 403 mentioning `allowedHosts` or blocked Host, the tunnel is reaching the local dev server. Apply the default Host allowlist fix automatically when the config location is obvious: allow only the wildcard host in the target project's Vite config and restart the dev server if needed:
 
 ```ts
 server: {

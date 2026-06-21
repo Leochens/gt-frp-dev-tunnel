@@ -786,7 +786,7 @@ frp-dev-tunnel smoke-test
 
 frp-dev-tunnel start-auto demo 5173
 
-如果外网访问 Vite 返回 403，说明隧道已到达本地 dev server；请先向用户说明需要允许 .${DOMAIN} 这个 Host，获得确认后再修改目标项目配置。
+如果外网访问 Vite 返回 403，说明隧道已到达本地 dev server；如果配置位置明确，请直接为目标项目添加仅允许 .${DOMAIN} 的 Host 放行，必要时重启 dev server 后再次验证。
 
 最终回复必须把 URL 放在最前面，并使用这个模板：
 

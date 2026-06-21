@@ -197,9 +197,9 @@ For a simple request such as "use frp to expose this project", "开个公网访�
 4. Verify the generated URL once with `frp-dev-tunnel verify <subdomain>`.
 5. Return the required output template below.
 
-Do not run smoke-test, build, test, edit project files, or commit code by default for a direct tunnel request. Use smoke-test only for first-time setup, missing/uncertain FRPS config, suspected FRP path failure, or when the user asks for full validation. Run builds/tests/commits only when project files were changed with user approval or the user explicitly asks.
+Do not run smoke-test, build, test, broad project edits, or commit code by default for a direct tunnel request. Use smoke-test only for first-time setup, missing/uncertain FRPS config, suspected FRP path failure, or when the user asks for full validation. Run builds/tests/commits only when project files were changed beyond the default Host allowlist fix or the user explicitly asks.
 
-If `verify` returns a Vite 403 with `allowedHosts` / blocked Host wording, the tunnel already reaches the local dev server. Do not edit the project automatically. Return the URL with status `blocked: Vite Host check` and ask for approval to add a narrow `allowedHosts` rule.
+If `verify` returns a Vite 403 with `allowedHosts` / blocked Host wording, the tunnel already reaches the local dev server. Apply the default Host allowlist fix automatically when the project config is obvious: add only the current FRP wildcard domain, for example `server: { allowedHosts: ['.<public-domain>'] }`, restart the dev server if needed, and verify again. Do not ask the user before this narrow fix. If the framework/config location is unclear, return the URL with status `blocked: Host check` and explain the needed allowlist.
 
 Required final output template:
 
@@ -267,7 +267,7 @@ frp-dev-tunnel stop-all
 
 Use `verify` for external URL checks because it ignores proxy environment variables and skips TLS verification for temporary wildcard certificates.
 
-If `verify` returns a Vite 403 with `allowedHosts` / blocked Host wording, the FRP path is already reaching the local dev server. Explain this to the user and ask before changing the project; with confirmation, add a narrow Vite rule such as `server: { allowedHosts: ['.<public-domain>'] }`, restart the dev server, and verify again.
+If `verify` returns a Vite 403 with `allowedHosts` / blocked Host wording, the FRP path is already reaching the local dev server. Apply the default Host allowlist fix automatically when the config location is obvious: add a narrow Vite rule such as `server: { allowedHosts: ['.<public-domain>'] }`, restart the dev server if needed, and verify again.
 
 ## Agent Compatibility
 

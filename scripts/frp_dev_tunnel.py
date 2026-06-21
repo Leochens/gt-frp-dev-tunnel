@@ -1189,7 +1189,7 @@ def print_verify_hint(status: int, body: str, config: dict[str, Any]) -> None:
         domain = config.get("public_domain") or "<public-domain>"
         print("")
         print("Hint: the request reached the local dev server, but the Host header was rejected.")
-        print("For Vite, ask before changing the project, then add a narrow allowedHosts rule, for example:")
+        print("For Vite, add the default narrow allowedHosts rule and verify again, for example:")
         print(f"  server: {{ allowedHosts: ['.{domain}'] }}")
     elif status in {502, 503, 504}:
         print("")
