@@ -719,10 +719,14 @@ def bootstrap_client(args: argparse.Namespace) -> None:
 
     print("")
     print("Next:")
-    print("  1. Validate the tunnel with the tiny smoke project:")
+    print("  Direct tunnel:")
+    print(f"     {command_example('start-auto', args.prefix, '<local-port>')}")
+    print("  First-time or uncertain FRP path:")
     print(f"     {command_example('smoke-test')}")
-    print("  2. If smoke-test works, start your real dev server on a known port.")
-    print(f"  3. Run: {command_example('start-auto', args.prefix, '<local-port>')}")
+    print("  Manage tunnels:")
+    print(f"     {command_example('list')}")
+    print(f"     {command_example('stop', '<subdomain>')}")
+    print(f"     {command_example('stop-all')}")
 
 
 def check_environment(_: argparse.Namespace) -> None:
@@ -822,10 +826,27 @@ def state_file(subdomain: str) -> Path:
     return work_dir() / subdomain / "state.json"
 
 
+def format_timestamp(value: Any) -> str:
+    if not value:
+        return "-"
+    try:
+        timestamp = int(value)
+    except (TypeError, ValueError):
+        return str(value)
+    return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))
+
+
 def write_state(subdomain: str, state: dict[str, Any]) -> None:
     path = state_file(subdomain)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(state, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def update_state(subdomain: str, values: dict[str, Any]) -> dict[str, Any]:
+    state = read_state(subdomain)
+    state.update(values)
+    write_state(subdomain, state)
+    return state
 
 
 def read_state(subdomain: str) -> dict[str, Any]:
@@ -958,6 +979,19 @@ def start_tunnel(args: argparse.Namespace, print_url: bool = True) -> str:
         start_docker_frpc(subdomain, config_file)
 
     url = f"{public_scheme(config)}://{subdomain}.{config['public_domain']}/"
+    update_state(
+        subdomain,
+        {
+            "kind": "tunnel",
+            "subdomain": subdomain,
+            "url": url,
+            "public_domain": config["public_domain"],
+            "public_scheme": public_scheme(config),
+            "local_ip": local_ip,
+            "local_port": local_port,
+            "started_at": int(time.time()),
+        },
+    )
     if print_url:
         print(url)
     return url
@@ -1039,6 +1073,7 @@ def smoke_test(args: argparse.Namespace) -> None:
     state = read_state(subdomain)
     state.update(
         {
+            "kind": "smoke",
             "smoke_server_pid": process.pid,
             "smoke_site_dir": str(smoke_dir),
             "smoke_log_file": str(smoke_log),
@@ -1119,6 +1154,7 @@ def stop_tunnel_by_subdomain(subdomain: str, quiet: bool = False) -> None:
 
 def stop_tunnel(args: argparse.Namespace) -> None:
     stop_tunnel_by_subdomain(args.subdomain)
+    print(f"Stopped: {args.subdomain}")
 
 
 def redact_text(text: str) -> str:
@@ -1186,28 +1222,114 @@ def verify_tunnel(args: argparse.Namespace) -> None:
         die(f"验证失败: {exc}")
 
 
-def status_tunnels(_: argparse.Namespace) -> None:
-    base = work_dir()
-    print(f"Work dir: {base}")
-    if base.exists():
-        for state_path in sorted(base.glob("*/state.json")):
-            try:
-                state = json.loads(state_path.read_text(encoding="utf-8"))
-            except json.JSONDecodeError:
-                continue
-            subdomain = state_path.parent.name
-            runner = state.get("runner", "?")
-            detail = state.get("pid") or state.get("container") or ""
-            print(f"{subdomain}\t{runner}\t{detail}")
+def docker_container_running(name: str) -> bool | None:
+    if not docker_base_command():
+        return None
+    result = docker_run(
+        ["ps", "--filter", f"name=^/{name}$", "--filter", "status=running", "--format", "{{.Names}}"],
+        check=False,
+        capture=True,
+    )
+    return name in result.stdout.splitlines()
 
-    if docker_base_command():
-        result = docker_run(
-            ["ps", "-a", "--filter", f"name={container_prefix()}-", "--format", "table {{.Names}}\t{{.Status}}\t{{.Image}}"],
-            check=False,
-            capture=True,
+
+def tunnel_status(state: dict[str, Any]) -> str:
+    runner = state.get("runner")
+    if runner == "local":
+        pid = state.get("pid")
+        try:
+            return "running" if pid and pid_exists(int(pid)) else "stale"
+        except (TypeError, ValueError):
+            return "stale"
+    if runner == "docker":
+        name = str(state.get("container") or "")
+        running = docker_container_running(name) if name else None
+        if running is True:
+            return "running"
+        if running is False:
+            return "stale"
+        return "unknown"
+    return "unknown"
+
+
+def state_url(subdomain: str, state: dict[str, Any], config: dict[str, Any]) -> str:
+    if state.get("url"):
+        return str(state["url"])
+    domain = state.get("public_domain") or config.get("public_domain")
+    if not domain:
+        return "-"
+    scheme = state.get("public_scheme") or config.get("public_scheme") or "http"
+    return f"{scheme}://{subdomain}.{domain}/"
+
+
+def tunnel_entries() -> list[dict[str, Any]]:
+    base = work_dir()
+    config = merge_config()
+    entries: list[dict[str, Any]] = []
+    if not base.exists():
+        return entries
+    for state_path in sorted(base.glob("*/state.json")):
+        try:
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+        subdomain = str(state.get("subdomain") or state_path.parent.name)
+        runner = str(state.get("runner") or "?")
+        local_ip = str(state.get("local_ip") or "127.0.0.1")
+        local_port = state.get("local_port") or state.get("smoke_local_port") or "-"
+        detail = state.get("pid") or state.get("container") or ""
+        entries.append(
+            {
+                "subdomain": subdomain,
+                "url": state_url(subdomain, state, config),
+                "status": tunnel_status(state),
+                "kind": state.get("kind") or "tunnel",
+                "local": f"{local_ip}:{local_port}",
+                "runner": runner,
+                "detail": str(detail),
+                "started_at": state.get("started_at"),
+                "started": format_timestamp(state.get("started_at")),
+                "state_file": str(state_path),
+                "stop_command": command_example("stop", subdomain),
+                "logs_command": command_example("logs", subdomain),
+                "verify_command": command_example("verify", subdomain),
+            }
         )
-        if result.stdout.strip():
-            print(result.stdout, end="")
+    return entries
+
+
+def status_tunnels(args: argparse.Namespace) -> None:
+    entries = tunnel_entries()
+    if getattr(args, "json", False):
+        print(json.dumps(entries, indent=2, ensure_ascii=False))
+        return
+
+    print(f"Work dir: {work_dir()}")
+    if not entries:
+        print("No managed tunnels.")
+        return
+
+    print("Managed tunnels:")
+    for entry in entries:
+        print(f"- {entry['subdomain']} [{entry['status']}]")
+        print(f"  url: {entry['url']}")
+        print(f"  local: {entry['local']}")
+        print(f"  runner: {entry['runner']} {entry['detail']}".rstrip())
+        print(f"  kind: {entry['kind']}")
+        print(f"  started: {entry['started']}")
+        print(f"  stop: {entry['stop_command']}")
+        print(f"  logs: {entry['logs_command']}")
+        print(f"  verify: {entry['verify_command']}")
+
+
+def stop_all_tunnels(_: argparse.Namespace) -> None:
+    entries = tunnel_entries()
+    if not entries:
+        print("No managed tunnels.")
+        return
+    for entry in entries:
+        stop_tunnel_by_subdomain(str(entry["subdomain"]), quiet=True)
+        print(f"Stopped: {entry['subdomain']}")
 
 
 def configure(args: argparse.Namespace) -> None:
@@ -1255,7 +1377,7 @@ def build_parser() -> argparse.ArgumentParser:
     start_auto.add_argument("local_ip", nargs="?")
     start_auto.set_defaults(func=start_auto_tunnel)
 
-    smoke = subparsers.add_parser("smoke-test", help="Run a tiny static test page through frp before exposing a real project.")
+    smoke = subparsers.add_parser("smoke-test", help="Run a tiny static test page through frp for first-time setup or FRP path checks.")
     smoke.add_argument("--prefix", default="smoke", help="Subdomain prefix. Default: smoke.")
     smoke.add_argument("--port", help="Optional local port for the tiny static test server.")
     smoke.add_argument("--no-verify", action="store_true", help="Skip public URL verification after starting.")
@@ -1275,7 +1397,15 @@ def build_parser() -> argparse.ArgumentParser:
     verify.set_defaults(func=verify_tunnel)
 
     status = subparsers.add_parser("status", help="Show managed temporary tunnels.")
+    status.add_argument("--json", action="store_true", help="Print managed tunnels as JSON.")
     status.set_defaults(func=status_tunnels)
+
+    list_cmd = subparsers.add_parser("list", help="Alias for status.")
+    list_cmd.add_argument("--json", action="store_true", help="Print managed tunnels as JSON.")
+    list_cmd.set_defaults(func=status_tunnels)
+
+    stop_all = subparsers.add_parser("stop-all", help="Stop and remove all managed tunnels.")
+    stop_all.set_defaults(func=stop_all_tunnels)
 
     doctor = subparsers.add_parser("doctor", help="Check Python, Node.js, frpc/Docker, and FRPS config.")
     doctor.set_defaults(func=check_environment)

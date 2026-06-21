@@ -95,13 +95,30 @@ That command installs the helper into the user's OS-level data directory, writes
 
 The examples below use `frp-dev-tunnel`; if bootstrap prints a full `Tunnel command` path, use that exact path instead.
 
-After bootstrap, validate with the tiny smoke project before exposing a real app:
+After bootstrap, either open a direct tunnel or validate with the tiny smoke project:
 
 ```bash
 frp-dev-tunnel smoke-test
 ```
 
-The smoke test creates a minimal static page outside the project, exposes it through frp, and prints a public URL plus cleanup command. Once that works, run the same helper in any real project by starting the project's dev server and then running `frp-dev-tunnel start-auto <project-name> <local-port>`.
+Use the smoke test for first-time setup or when the FRP path is uncertain. For an already configured machine, run the same helper in any real project by starting the project's dev server and then running `frp-dev-tunnel start-auto <project-name> <local-port>`.
+
+Recommended final output for agents:
+
+```text
+公网访问已开启
+URL: <public-url>
+状态: <HTTP 200 OK | blocked: reason | unverified: reason>
+本地服务: <local-ip>:<local-port>
+隧道名: <subdomain>
+
+管理:
+- 查看全部: frp-dev-tunnel list
+- 验证当前: frp-dev-tunnel verify <subdomain>
+- 查看日志: frp-dev-tunnel logs <subdomain>
+- 停止当前: frp-dev-tunnel stop <subdomain>
+- 停止全部: frp-dev-tunnel stop-all
+```
 
 The same prompt is saved on the server at:
 
@@ -123,6 +140,7 @@ frp-dev-tunnel config \
 frp-dev-tunnel doctor
 frp-dev-tunnel smoke-test
 frp-dev-tunnel start-auto demo 5173
+frp-dev-tunnel list
 ```
 
 If external Vite access returns a 403 mentioning `allowedHosts` or blocked Host, the tunnel is reaching the local dev server. Ask before changing the target project, then allow the wildcard host in the target project's Vite config and restart the dev server:
@@ -137,4 +155,5 @@ Stop a tunnel:
 
 ```bash
 frp-dev-tunnel stop <subdomain>
+frp-dev-tunnel stop-all
 ```

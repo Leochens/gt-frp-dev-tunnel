@@ -778,15 +778,30 @@ $(client_bootstrap_command)
 
 下面示例里的 frp-dev-tunnel 指 bootstrap 输出的 Tunnel command；如果它打印的是完整路径，请使用那条完整路径。
 
-第四步：先跑一个极小 smoke 项目验证链路是否打通：
+第四步：如果这是首次配置，或不确定 FRP 链路是否打通，先跑一个极小 smoke 项目验证：
 
 frp-dev-tunnel smoke-test
 
-smoke-test 成功后，再在真实项目里启动本地 dev server，并按实际端口启动临时隧道，例如：
+如果本机已经配置过、用户只是要一个公网访问链接，可以直接在真实项目里启动本地 dev server，并按实际端口启动临时隧道，例如：
 
 frp-dev-tunnel start-auto demo 5173
 
 如果外网访问 Vite 返回 403，说明隧道已到达本地 dev server；请先向用户说明需要允许 .${DOMAIN} 这个 Host，获得确认后再修改目标项目配置。
+
+最终回复必须把 URL 放在最前面，并使用这个模板：
+
+公网访问已开启
+URL: <public-url>
+状态: <HTTP 200 OK | blocked: reason | unverified: reason>
+本地服务: <local-ip>:<local-port>
+隧道名: <subdomain>
+
+管理:
+- 查看全部: frp-dev-tunnel list
+- 验证当前: frp-dev-tunnel verify <subdomain>
+- 查看日志: frp-dev-tunnel logs <subdomain>
+- 停止当前: frp-dev-tunnel stop <subdomain>
+- 停止全部: frp-dev-tunnel stop-all
 ---
 EOF
 )"
