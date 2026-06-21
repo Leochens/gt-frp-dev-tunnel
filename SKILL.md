@@ -47,16 +47,24 @@ The helper checks:
 
 - Python 3.8+ for the cross-platform tunnel helper.
 - Node.js 18+ for common local frontend/Node dev servers.
-- A local `frpc` binary, or Docker as a fallback runner.
+- A local `frpc` binary; existing Docker can be reused as a compatibility fallback.
 - FRPS config completeness.
 
-Install only what is missing. Prefer the one-line install command printed by `doctor`. Do not add project npm dependencies globally unless the target project explicitly requires it.
+Install only what is missing. Prefer the one-line install command printed by `doctor`. Do not ask the user to install Docker for this skill; installing the small `frpc` client is the lower-cost path. Do not add project npm dependencies globally unless the target project explicitly requires it.
 
 Runner choice:
 
 - Prefer local `frpc` when available. It works consistently across macOS, Windows, and Linux.
-- Use Docker only when `frpc` is absent or the user prefers Docker. On macOS/Windows Docker mode defaults the tunnel target to `host.docker.internal`; on Linux it uses host networking.
+- Use Docker only when Docker already exists on the machine or the user explicitly prefers it. On macOS/Windows Docker mode defaults the tunnel target to `host.docker.internal`; on Linux it uses host networking.
 - Override with `FRP_RUNNER=local` or `FRP_RUNNER=docker` when needed.
+
+If `doctor` reports that neither `frpc` nor Docker is available, install `frpc`:
+
+```bash
+scripts/frp-dev-tunnel.sh install-frpc
+```
+
+This installs only the `frpc` binary into the user-local bin directory. It does not require Docker or sudo.
 
 ## Configure FRPS
 
@@ -148,6 +156,7 @@ For Codex, Claude Code, OpenCloud, or other agents:
 - If the shell has an interactive TTY, run `config` and let the helper prompt.
 - If there is no interactive TTY and config is missing, ask the user for exactly: FRPS connection domain/IP, FRPS port, and FRPS token. Ask for public wildcard domain only when it differs.
 - Store config with the helper instead of embedding secrets in the skill or project files.
+- If no tunnel runner exists, run `install-frpc`; do not tell the user to install Docker unless they explicitly want Docker.
 - On Windows, prefer `scripts\frp-dev-tunnel.cmd` or `py -3 scripts\frp_dev_tunnel.py`.
 - On macOS/Linux, prefer `scripts/frp-dev-tunnel.sh`.
 - Keep returned user-facing output short: URL, verification result, and cleanup command when useful.

@@ -11,17 +11,21 @@ import secrets
 import shutil
 import signal
 import ssl
+import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 from pathlib import Path
 from typing import Any
 
 APP_NAME = "gt-frp-dev-tunnel"
+DEFAULT_FRP_VERSION = "0.67.0"
 DEFAULT_IMAGE = "snowdreamtech/frpc:0.67.0"
 CONTAINER_CONFIG_PATH = "/etc/frp/frpc.toml"
 MIN_PYTHON = (3, 8)
@@ -68,6 +72,23 @@ def work_dir() -> Path:
     if override:
         return Path(override).expanduser()
     return Path(tempfile.gettempdir()) / APP_NAME
+
+
+def default_bin_dir() -> Path:
+    override = os.environ.get("FRP_TUNNEL_BIN_DIR")
+    if override:
+        return Path(override).expanduser()
+
+    if platform.system() == "Windows":
+        base = os.environ.get("LOCALAPPDATA") or os.environ.get("APPDATA")
+        if base:
+            return Path(base) / APP_NAME / "bin"
+
+    xdg_bin_home = os.environ.get("XDG_BIN_HOME")
+    if xdg_bin_home:
+        return Path(xdg_bin_home).expanduser()
+
+    return Path.home() / ".local" / "bin"
 
 
 def load_json_config() -> dict[str, Any]:
@@ -525,7 +546,15 @@ def frpc_binary() -> str | None:
         if found:
             return found
         die(f"FRPC_BIN 指向的 frpc 不存在: {override}")
-    return shutil.which("frpc")
+    found = shutil.which("frpc")
+    if found:
+        return found
+
+    bundled_name = "frpc.exe" if platform.system() == "Windows" else "frpc"
+    bundled = default_bin_dir() / bundled_name
+    if bundled.exists():
+        return str(bundled)
+    return None
 
 
 def choose_runner(requested: str | None = None) -> str:
@@ -534,17 +563,111 @@ def choose_runner(requested: str | None = None) -> str:
         die("FRP_RUNNER 只能是 auto、local 或 docker")
     if runner == "local":
         if not frpc_binary():
-            die("未找到 frpc；请安装 frpc，或使用 FRP_RUNNER=docker")
+            die("未找到 frpc；请运行 scripts/frp-dev-tunnel.sh install-frpc，或在已有 Docker 时使用 FRP_RUNNER=docker")
         return "local"
     if runner == "docker":
         if not docker_base_command():
-            die("Docker 不可用；请安装/启动 Docker，或使用 FRP_RUNNER=local")
+            die("Docker 不可用。请不要为了此 skill 安装 Docker；运行 scripts/frp-dev-tunnel.sh install-frpc 后使用本地 frpc")
         return "docker"
     if frpc_binary():
         return "local"
     if docker_base_command():
         return "docker"
-    die("未找到 frpc，也无法访问 Docker。请安装 frpc 或 Docker 后重试")
+    die("未找到 frpc，也没有可复用的 Docker。请运行 scripts/frp-dev-tunnel.sh install-frpc 安装轻量 frpc 客户端")
+
+
+def normalize_arch(raw: str) -> str:
+    machine = raw.lower()
+    if machine in {"x86_64", "amd64"}:
+        return "amd64"
+    if machine in {"aarch64", "arm64"}:
+        return "arm64"
+    if machine in {"i386", "i686", "x86"}:
+        return "386"
+    if machine.startswith("armv7"):
+        return "arm"
+    die(f"暂不支持当前 CPU 架构: {raw}")
+
+
+def frp_release_asset(version: str) -> tuple[str, str]:
+    system = platform.system()
+    if system == "Darwin":
+        os_name = "darwin"
+        ext = "tar.gz"
+    elif system == "Linux":
+        os_name = "linux"
+        ext = "tar.gz"
+    elif system == "Windows":
+        os_name = "windows"
+        ext = "zip"
+    else:
+        die(f"暂不支持当前系统自动安装 frpc: {system}")
+
+    arch = normalize_arch(platform.machine())
+    base = f"frp_{version}_{os_name}_{arch}"
+    filename = f"{base}.{ext}"
+    url = f"https://github.com/fatedier/frp/releases/download/v{version}/{filename}"
+    return url, base
+
+
+def extract_frpc(archive: Path, base_dir_name: str, target: Path) -> None:
+    wanted = f"{base_dir_name}/frpc.exe" if platform.system() == "Windows" else f"{base_dir_name}/frpc"
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    if archive.suffix == ".zip":
+        with zipfile.ZipFile(archive) as zf:
+            member = next((name for name in zf.namelist() if name.replace("\\", "/") == wanted), None)
+            if not member:
+                die("下载包里没有找到 frpc")
+            with zf.open(member) as src, target.open("wb") as dst:
+                shutil.copyfileobj(src, dst)
+    else:
+        with tarfile.open(archive, "r:gz") as tf:
+            member = next((item for item in tf.getmembers() if item.name == wanted), None)
+            if not member:
+                die("下载包里没有找到 frpc")
+            src = tf.extractfile(member)
+            if not src:
+                die("无法读取 frpc 文件")
+            with src, target.open("wb") as dst:
+                shutil.copyfileobj(src, dst)
+
+    if platform.system() != "Windows":
+        current_mode = target.stat().st_mode
+        target.chmod(current_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+
+def install_frpc(args: argparse.Namespace) -> None:
+    existing = frpc_binary()
+    if existing and not args.force:
+        print(f"frpc 已存在: {existing}")
+        return
+
+    version = args.version
+    url, base_dir_name = frp_release_asset(version)
+    target_dir = Path(args.bin_dir).expanduser() if args.bin_dir else default_bin_dir()
+    target_name = "frpc.exe" if platform.system() == "Windows" else "frpc"
+    target = target_dir / target_name
+
+    print(f"Downloading frpc {version}: {url}")
+    with tempfile.TemporaryDirectory(prefix=f"{APP_NAME}-") as tmp:
+        archive = Path(tmp) / Path(urllib.parse.urlparse(url).path).name
+        try:
+            urllib.request.urlretrieve(url, archive)
+        except Exception as exc:
+            die(f"下载 frpc 失败: {exc}")
+        extract_frpc(archive, base_dir_name, target)
+
+    print(f"frpc installed: {target}")
+    if shutil.which("frpc") or str(target.parent) in os.environ.get("PATH", "").split(os.pathsep):
+        print("frpc is ready.")
+    elif platform.system() == "Windows":
+        print(f"当前终端可用: set FRPC_BIN={target}")
+        print(f"持久添加 PATH: setx PATH \"%PATH%;{target.parent}\"")
+    else:
+        shell_rc = "~/.zshrc" if os.environ.get("SHELL", "").endswith("zsh") else "~/.bashrc"
+        print(f"当前终端可用: export FRPC_BIN={target}")
+        print(f"持久添加 PATH: echo 'export PATH=\"{target.parent}:$PATH\"' >> {shell_rc}")
 
 
 def check_environment(_: argparse.Namespace) -> None:
@@ -577,10 +700,11 @@ def check_environment(_: argparse.Namespace) -> None:
     if frpc:
         print(f"OK frpc: {frpc}")
     elif docker:
-        print("OK Docker: 可作为 frpc 运行器")
-        warnings.append("未找到本地 frpc，将使用 Docker 运行 frpc；macOS/Windows 会自动用 host.docker.internal 访问本机服务")
+        print("OK Docker: 已存在，可作为临时 frpc 运行器")
+        warnings.append("未找到本地 frpc；Docker 只作为已有环境的兼容 fallback，不建议为了此 skill 安装 Docker")
+        warnings.append("更轻量的本地路径: scripts/frp-dev-tunnel.sh install-frpc")
     else:
-        failures.append("未找到 frpc，也无法访问 Docker；至少需要安装其中一个才能启动隧道")
+        failures.append("未找到 frpc，也没有可复用的 Docker；请安装轻量 frpc 客户端，不要为了此 skill 安装 Docker")
 
     config = merge_config()
     missing = missing_config_keys(config)
@@ -599,6 +723,10 @@ def check_environment(_: argparse.Namespace) -> None:
         print("\nInstall missing runtime dependencies:")
         for command in hints:
             print(f"  {command}")
+
+    if not frpc and not docker:
+        print("\nInstall frpc:")
+        print("  scripts/frp-dev-tunnel.sh install-frpc")
 
     if missing:
         print("\nConfigure FRPS:")
@@ -953,6 +1081,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     doctor = subparsers.add_parser("doctor", help="Check Python, Node.js, frpc/Docker, and FRPS config.")
     doctor.set_defaults(func=check_environment)
+
+    install = subparsers.add_parser("install-frpc", help="Install a lightweight frpc binary into the user bin directory.")
+    install.add_argument("--version", default=DEFAULT_FRP_VERSION, help=f"frp release version. Default: {DEFAULT_FRP_VERSION}.")
+    install.add_argument("--bin-dir", help="Install directory. Default: FRP_TUNNEL_BIN_DIR or user-local bin.")
+    install.add_argument("--force", action="store_true", help="Reinstall even when frpc already exists.")
+    install.set_defaults(func=install_frpc)
 
     config = subparsers.add_parser("config", help="Configure FRPS connection details.")
     config.add_argument("--server-addr", dest="server_addr", help="FRPS serverAddr domain or IP. May include :port.")
