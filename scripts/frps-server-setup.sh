@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 
 APP_NAME="gt-frp-dev-tunnel"
+REPO_URL="https://github.com/Leochens/gt-frp-dev-tunnel"
 DEFAULT_FRP_VERSION="0.67.0"
 
 FRP_DIR="/opt/frp"
@@ -759,18 +760,27 @@ write_client_prompt() {
 ---
 服务端已经准备好。下面的命令包含 FRPS token，只发送给可信的本地开发 Agent。
 
-在配置客户端前，请先确认服务器厂商控制台的安全组/防火墙已经放行入站 TCP ${SERVER_PORT}。
+第一步：先检查本地 Agent 是否已安装 gt-frp-dev-tunnel skill。
+- 如果已安装：从 ${REPO_URL} 重新安装/刷新这个 skill。
+- 如果未安装：先从 ${REPO_URL} 安装这个 skill。
+- 如果当前 Agent 平台不支持 skill/plugin/connector，继续使用下面的 helper bootstrap 命令。
+
+第二步：在配置客户端前，请先确认服务器厂商控制台的安全组/防火墙已经放行入站 TCP ${SERVER_PORT}。
 如果不确定，请从客户端电脑或任意外部机器运行：
 
 $(port_check_command "${SERVER_ADDR}" "${SERVER_PORT}")
 
 如果端口不通，请先去服务器厂商控制台放行 TCP ${SERVER_PORT}，开启后再次运行同一条 check-port 命令确认成功。
 
-端口确认可达后，在本地项目根目录运行这一条命令。它会下载 helper、写入本机 FRP 配置、安装轻量 frpc（如缺失）并运行 doctor：
+第三步：端口确认可达后，在一个本地验证目录或目标项目根目录运行这一条命令。它会下载 helper、写入本机 FRP 配置、安装轻量 frpc（如缺失）并运行 doctor：
 
 $(client_bootstrap_command)
 
-然后启动目标项目的本地 dev server，并按实际端口启动临时隧道，例如：
+第四步：先跑一个极小 smoke 项目验证链路是否打通：
+
+scripts/frp-dev-tunnel.sh smoke-test
+
+smoke-test 成功后，再在真实项目里启动本地 dev server，并按实际端口启动临时隧道，例如：
 
 scripts/frp-dev-tunnel.sh start-auto demo 5173
 

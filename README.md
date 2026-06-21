@@ -78,6 +78,12 @@ If the check says the port is not reachable, open the port in the cloud firewall
 
 After the server setup finishes, copy the printed prompt to your local development Agent or sub-agent. The prompt is intentionally generic because the receiving Agent might be Codex, Claude Code, OpenCode, OpenCloud, or another coding assistant.
 
+The local Agent should first check whether `gt-frp-dev-tunnel` is installed as a skill/plugin/connector:
+
+- If it is already installed, reinstall or refresh it from this repository.
+- If it is not installed, install it first.
+- If the platform does not support skills, use the helper script path below.
+
 The prompt gives the local Agent a single bootstrap command like:
 
 ```bash
@@ -85,6 +91,14 @@ curl -fsSL https://raw.githubusercontent.com/Leochens/gt-frp-dev-tunnel/main/scr
 ```
 
 That command downloads the helper into the current project, writes the local FRP config, installs the lightweight `frpc` client if missing, and runs `doctor`. It does not write the token into git-tracked project files.
+
+After bootstrap, validate with the tiny smoke project before exposing a real app:
+
+```bash
+scripts/frp-dev-tunnel.sh smoke-test
+```
+
+The smoke test creates a minimal static page, exposes it through frp, and prints a public URL plus cleanup command. Once that works, run the same helper in any real project by starting the project's dev server and then running `scripts/frp-dev-tunnel.sh start-auto <project-name> <local-port>`.
 
 The same prompt is saved on the server at:
 
@@ -97,13 +111,14 @@ The same prompt is saved on the server at:
 On the local development machine, the bootstrap command is preferred. If you already installed or cloned this repository:
 
 ```bash
-scripts/frp-dev-tunnel.sh doctor
 scripts/frp-dev-tunnel.sh config \
   --server-addr <frps-domain-or-ip> \
   --server-port <frps-port> \
   --token '<frps-token>' \
   --public-domain <wildcard-domain> \
   --public-scheme <http-or-https>
+scripts/frp-dev-tunnel.sh doctor
+scripts/frp-dev-tunnel.sh smoke-test
 scripts/frp-dev-tunnel.sh start-auto demo 5173
 ```
 

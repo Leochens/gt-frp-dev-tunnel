@@ -10,6 +10,7 @@ import re
 import secrets
 import shutil
 import signal
+import socket
 import ssl
 import stat
 import subprocess
@@ -698,8 +699,10 @@ def bootstrap_client(args: argparse.Namespace) -> None:
 
     print("")
     print("Next:")
-    print("  1. Start the local dev server on the target port.")
-    print(f"  2. Run: scripts/frp-dev-tunnel.sh start-auto {args.prefix} <local-port>")
+    print("  1. Validate the tunnel with the tiny smoke project:")
+    print("     scripts/frp-dev-tunnel.sh smoke-test")
+    print("  2. If smoke-test works, start your real dev server on a known port.")
+    print(f"  3. Run: scripts/frp-dev-tunnel.sh start-auto {args.prefix} <local-port>")
 
 
 def check_environment(_: argparse.Namespace) -> None:
@@ -779,6 +782,12 @@ def default_local_ip(runner: str) -> str:
     if runner == "docker" and platform.system() in {"Darwin", "Windows"}:
         return "host.docker.internal"
     return "127.0.0.1"
+
+
+def find_free_local_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
 
 
 def container_prefix() -> str:
@@ -908,7 +917,7 @@ def start_docker_frpc(subdomain: str, config_file: Path) -> None:
         eprint(redact_text(logs.stdout + logs.stderr))
 
 
-def start_tunnel(args: argparse.Namespace) -> None:
+def start_tunnel(args: argparse.Namespace, print_url: bool = True) -> str:
     subdomain = args.subdomain
     validate_subdomain(subdomain)
     local_port = validate_port(args.local_port, "本地端口")
@@ -928,12 +937,116 @@ def start_tunnel(args: argparse.Namespace) -> None:
     else:
         start_docker_frpc(subdomain, config_file)
 
-    print(f"{public_scheme(config)}://{subdomain}.{config['public_domain']}/")
+    url = f"{public_scheme(config)}://{subdomain}.{config['public_domain']}/"
+    if print_url:
+        print(url)
+    return url
 
 
 def start_auto_tunnel(args: argparse.Namespace) -> None:
     args.subdomain = generate_subdomain(args.prefix)
     start_tunnel(args)
+
+
+def start_static_smoke_server(site_dir: Path, port: int, log_file: Path) -> subprocess.Popen[bytes]:
+    site_dir.mkdir(parents=True, exist_ok=True)
+    (site_dir / "index.html").write_text(
+        """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FRP smoke test</title>
+</head>
+<body>
+  <main>
+    <h1>FRP smoke test OK</h1>
+    <p>This tiny page is served from your local machine through frp.</p>
+  </main>
+</body>
+</html>
+""",
+        encoding="utf-8",
+    )
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+    log = log_file.open("ab")
+    start_new_session = platform.system() != "Windows"
+    creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if platform.system() == "Windows" else 0
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "http.server",
+            str(port),
+            "--bind",
+            "127.0.0.1",
+            "--directory",
+            str(site_dir),
+        ],
+        stdout=log,
+        stderr=subprocess.STDOUT,
+        start_new_session=start_new_session,
+        creationflags=creationflags,
+    )
+    time.sleep(1)
+    if process.poll() is not None:
+        tail_log(log_file)
+        die("smoke-test 静态服务启动失败")
+    return process
+
+
+def smoke_test(args: argparse.Namespace) -> None:
+    ensure_config(merge_config(), allow_prompt=True)
+    port = validate_port(args.port, "smoke-test 端口") if args.port else find_free_local_port()
+    subdomain = generate_subdomain(args.prefix)
+    smoke_dir = work_dir() / f"{subdomain}-smoke-site"
+    smoke_log = work_dir() / f"{subdomain}-smoke.log"
+
+    process = start_static_smoke_server(smoke_dir, port, smoke_log)
+    try:
+        tunnel_args = argparse.Namespace(
+            subdomain=subdomain,
+            local_port=str(port),
+            local_ip="127.0.0.1",
+            runner=args.runner,
+        )
+        url = start_tunnel(tunnel_args, print_url=False)
+    except Exception:
+        stop_local_pid(process.pid)
+        shutil.rmtree(smoke_dir, ignore_errors=True)
+        raise
+
+    state = read_state(subdomain)
+    state.update(
+        {
+            "smoke_server_pid": process.pid,
+            "smoke_site_dir": str(smoke_dir),
+            "smoke_log_file": str(smoke_log),
+            "smoke_local_port": port,
+        }
+    )
+    write_state(subdomain, state)
+
+    config = ensure_config(merge_config(), allow_prompt=False)
+    print("")
+    print("Smoke test project:")
+    print(f"  local:  http://127.0.0.1:{port}/")
+    print(f"  public: {url}")
+
+    if not args.no_verify:
+        print("")
+        print("Verifying public URL...")
+        try:
+            verify_tunnel(argparse.Namespace(subdomain=subdomain, path="/"))
+        except TunnelError as exc:
+            eprint(f"warning: smoke-test verify failed: {exc}")
+            eprint("warning: tunnel is still running; inspect the public URL or run logs/status.")
+
+    print("")
+    print("If the smoke page works, use this skill in any other project:")
+    print("  1. Start that project's dev server on a known local port.")
+    print("  2. Run: scripts/frp-dev-tunnel.sh start-auto <project-name> <local-port>")
+    print(f"  3. Stop this smoke test when done: scripts/frp-dev-tunnel.sh stop {subdomain}")
 
 
 def stop_local_pid(pid: int) -> None:
@@ -961,6 +1074,15 @@ def stop_local_pid(pid: int) -> None:
 def stop_tunnel_by_subdomain(subdomain: str, quiet: bool = False) -> None:
     validate_subdomain(subdomain)
     state = read_state(subdomain)
+    if state.get("smoke_server_pid"):
+        stop_local_pid(int(state["smoke_server_pid"]))
+    if state.get("smoke_site_dir"):
+        shutil.rmtree(str(state["smoke_site_dir"]), ignore_errors=True)
+    if state.get("smoke_log_file"):
+        try:
+            Path(str(state["smoke_log_file"])).unlink()
+        except FileNotFoundError:
+            pass
     if state.get("runner") == "local" and state.get("pid"):
         stop_local_pid(int(state["pid"]))
     else:
@@ -1112,6 +1234,12 @@ def build_parser() -> argparse.ArgumentParser:
     start_auto.add_argument("local_port")
     start_auto.add_argument("local_ip", nargs="?")
     start_auto.set_defaults(func=start_auto_tunnel)
+
+    smoke = subparsers.add_parser("smoke-test", help="Run a tiny static test page through frp before exposing a real project.")
+    smoke.add_argument("--prefix", default="smoke", help="Subdomain prefix. Default: smoke.")
+    smoke.add_argument("--port", help="Optional local port for the tiny static test server.")
+    smoke.add_argument("--no-verify", action="store_true", help="Skip public URL verification after starting.")
+    smoke.set_defaults(func=smoke_test)
 
     stop = subparsers.add_parser("stop", help="Stop and remove one tunnel.")
     stop.add_argument("subdomain")
