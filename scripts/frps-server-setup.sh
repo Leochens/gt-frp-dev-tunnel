@@ -772,19 +772,21 @@ $(port_check_command "${SERVER_ADDR}" "${SERVER_PORT}")
 
 如果端口不通，请先去服务器厂商控制台放行 TCP ${SERVER_PORT}，开启后再次运行同一条 check-port 命令确认成功。
 
-第三步：端口确认可达后，在一个本地验证目录或目标项目根目录运行这一条命令。它会下载 helper、写入本机 FRP 配置、安装轻量 frpc（如缺失）并运行 doctor：
+第三步：端口确认可达后，在本机任意目录运行这一条命令。它会把 helper 安装到用户级目录，配置保存到用户配置目录，安装轻量 frpc（如缺失）并运行 doctor；不要把 helper 脚本复制进目标项目，也不要提交到项目仓库：
 
 $(client_bootstrap_command)
 
+下面示例里的 frp-dev-tunnel 指 bootstrap 输出的 Tunnel command；如果它打印的是完整路径，请使用那条完整路径。
+
 第四步：先跑一个极小 smoke 项目验证链路是否打通：
 
-scripts/frp-dev-tunnel.sh smoke-test
+frp-dev-tunnel smoke-test
 
 smoke-test 成功后，再在真实项目里启动本地 dev server，并按实际端口启动临时隧道，例如：
 
-scripts/frp-dev-tunnel.sh start-auto demo 5173
+frp-dev-tunnel start-auto demo 5173
 
-如果外网访问 Vite 返回 403，请在目标项目的 Vite 配置里允许 .${DOMAIN} 这个 Host 后重启 dev server。
+如果外网访问 Vite 返回 403，说明隧道已到达本地 dev server；请先向用户说明需要允许 .${DOMAIN} 这个 Host，获得确认后再修改目标项目配置。
 ---
 EOF
 )"

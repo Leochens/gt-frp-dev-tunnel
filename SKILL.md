@@ -64,7 +64,7 @@ The server script:
 curl -fsSL https://raw.githubusercontent.com/Leochens/gt-frp-dev-tunnel/main/scripts/frps-server-setup.sh | bash -s -- check-port --host <frps-domain-or-ip> --port 7111
 ```
 
-- Prints a client-side prompt that first tells the local Agent to check/install/reinstall this skill, then gives a single `frp-client-bootstrap.sh` command. That command downloads the local helper into the target project, writes the FRP client config, installs lightweight `frpc` if missing, and runs `doctor`.
+- Prints a client-side prompt that first tells the local Agent to check/install/reinstall this skill, then gives a single `frp-client-bootstrap.sh` command. That command installs the helper into the user's OS-level data directory, writes FRP client config into the user's OS-level config directory, installs lightweight `frpc` if missing, and runs `doctor`.
 
 Do not rewrite that final prompt as Codex-only instructions. The receiving Agent may be Codex, Claude Code, OpenCode, OpenCloud, or another coding assistant, so keep the wording generic: "your local Agent / sub-agent".
 
@@ -73,7 +73,8 @@ Client-side skill install rule:
 - First check whether `gt-frp-dev-tunnel` is already installed in the local Agent's skill/plugin/connector system.
 - If it is installed, reinstall or refresh it from `https://github.com/Leochens/gt-frp-dev-tunnel`.
 - If it is missing, install it from that repository before continuing.
-- If the platform has no skill mechanism, use the helper scripts directly.
+- If the platform has no skill mechanism, use the bootstrap/helper command directly.
+- Never copy helper scripts, generated frpc config, logs, or tokens into the user's project. Do not stage or commit tunnel helper files in a project repository.
 
 Default the public URL scheme to `http` unless the server setup receives a wildcard TLS certificate or the user explicitly chooses `https`. If a user chooses `https` without a wildcard certificate/CDN/gateway that handles `*.domain`, warn them that HTTPS may fail with TLS/SNI errors and that `--public-scheme http` is the lower-friction validation path.
 
@@ -84,13 +85,13 @@ If the port check fails, tell the user to open inbound TCP `7111` or their chose
 Run the bundled environment check before starting a tunnel:
 
 ```bash
-scripts/frp-dev-tunnel.sh doctor
+frp-dev-tunnel doctor
 ```
 
 On Windows without Bash:
 
 ```bat
-scripts\frp-dev-tunnel.cmd doctor
+frp-dev-tunnel.cmd doctor
 ```
 
 The helper checks:
@@ -111,7 +112,7 @@ Runner choice:
 If `doctor` reports that neither `frpc` nor Docker is available, install `frpc`:
 
 ```bash
-scripts/frp-dev-tunnel.sh install-frpc
+frp-dev-tunnel install-frpc
 ```
 
 This installs only the `frpc` binary into the user-local bin directory. It does not require Docker or sudo.
@@ -126,16 +127,18 @@ curl -fsSL https://raw.githubusercontent.com/Leochens/gt-frp-dev-tunnel/main/scr
 
 Use this when helping another local Agent/client machine. It avoids manual token copying across multiple commands and keeps secrets out of project files.
 
+After bootstrap, use the exact `Tunnel command` path it prints. The examples below use `frp-dev-tunnel` for readability.
+
 Interactive setup:
 
 ```bash
-scripts/frp-dev-tunnel.sh config
+frp-dev-tunnel config
 ```
 
 Non-interactive setup for agents or CI-like shells:
 
 ```bash
-scripts/frp-dev-tunnel.sh config \
+frp-dev-tunnel config \
   --server-addr <frps-domain-or-ip> \
   --server-port <frps-port> \
   --token <frps-token>
@@ -144,7 +147,7 @@ scripts/frp-dev-tunnel.sh config \
 If the public wildcard domain is not the same as `serverAddr`:
 
 ```bash
-scripts/frp-dev-tunnel.sh config \
+frp-dev-tunnel config \
   --server-addr <frps-domain-or-ip> \
   --server-port <frps-port> \
   --token <frps-token> \
@@ -154,7 +157,7 @@ scripts/frp-dev-tunnel.sh config \
 If the server setup output includes a public URL scheme, preserve it:
 
 ```bash
-scripts/frp-dev-tunnel.sh config \
+frp-dev-tunnel config \
   --server-addr <frps-domain-or-ip> \
   --server-port <frps-port> \
   --token <frps-token> \
@@ -189,10 +192,10 @@ Never print the token back to the user. The helper redacts tokens in config and 
 Before exposing a real project, run the built-in tiny smoke project:
 
 ```bash
-scripts/frp-dev-tunnel.sh smoke-test
+frp-dev-tunnel smoke-test
 ```
 
-This creates a minimal static page with Python's standard library, exposes it through frp, verifies the public URL, and prints a stop command. Use it only to prove the FRP path works.
+This creates a minimal static page with Python's standard library outside the user's project, exposes it through frp, verifies the public URL, and prints a stop command. Use it only to prove the FRP path works.
 
 After the smoke page works:
 
@@ -201,7 +204,7 @@ After the smoke page works:
 3. Run `start-auto` to generate a high-entropy subdomain:
 
 ```bash
-scripts/frp-dev-tunnel.sh start-auto demo 5173
+frp-dev-tunnel start-auto demo 5173
 ```
 
 The script prints a URL like:
@@ -215,21 +218,21 @@ Give the user the printed URL only, unless they ask for diagnostics.
 Manual subdomain:
 
 ```bash
-scripts/frp-dev-tunnel.sh start <subdomain> <local-port> [local-ip]
+frp-dev-tunnel start <subdomain> <local-port> [local-ip]
 ```
 
 Status, logs, verify, and cleanup:
 
 ```bash
-scripts/frp-dev-tunnel.sh status
-scripts/frp-dev-tunnel.sh logs <subdomain>
-scripts/frp-dev-tunnel.sh verify <subdomain> [path]
-scripts/frp-dev-tunnel.sh stop <subdomain>
+frp-dev-tunnel status
+frp-dev-tunnel logs <subdomain>
+frp-dev-tunnel verify <subdomain> [path]
+frp-dev-tunnel stop <subdomain>
 ```
 
 Use `verify` for external URL checks because it ignores proxy environment variables and skips TLS verification for temporary wildcard certificates.
 
-If `verify` returns a Vite 403 with `allowedHosts` / blocked Host wording, the FRP path is already reaching the local dev server. Add a narrow Vite rule such as `server: { allowedHosts: ['.<public-domain>'] }`, restart the dev server, and verify again.
+If `verify` returns a Vite 403 with `allowedHosts` / blocked Host wording, the FRP path is already reaching the local dev server. Explain this to the user and ask before changing the project; with confirmation, add a narrow Vite rule such as `server: { allowedHosts: ['.<public-domain>'] }`, restart the dev server, and verify again.
 
 ## Agent Compatibility
 
@@ -238,12 +241,12 @@ For Codex, Claude Code, OpenCloud, or other agents:
 - First check whether this skill is installed. Reinstall/refresh it when present; install it when missing.
 - If the shell has an interactive TTY, run `config` and let the helper prompt.
 - If there is no interactive TTY and config is missing, ask the user for exactly: FRPS connection domain/IP, FRPS port, and FRPS token. Ask for public wildcard domain only when it differs.
-- Store config with the helper instead of embedding secrets in the skill or project files.
+- Store config with the helper in the OS user config directory instead of embedding secrets in the skill or project files.
 - Prefer the `frp-client-bootstrap.sh` command generated by the server setup over manually copying multiple config commands.
-- Run `scripts/frp-dev-tunnel.sh smoke-test` before touching the user's real project.
+- Run `frp-dev-tunnel smoke-test` before touching the user's real project.
 - If no tunnel runner exists, run `install-frpc`; do not tell the user to install Docker unless they explicitly want Docker.
-- On Windows, prefer `scripts\frp-dev-tunnel.cmd` or `py -3 scripts\frp_dev_tunnel.py`.
-- On macOS/Linux, prefer `scripts/frp-dev-tunnel.sh`.
+- On Windows, prefer `frp-dev-tunnel.cmd` or the helper path printed by bootstrap.
+- On macOS/Linux, prefer `frp-dev-tunnel` or the helper path printed by bootstrap.
 - Keep returned user-facing output short: URL, verification result, and cleanup command when useful.
 
 ## Frontend And API Cases

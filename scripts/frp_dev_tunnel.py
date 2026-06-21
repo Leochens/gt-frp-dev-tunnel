@@ -8,6 +8,7 @@ import os
 import platform
 import re
 import secrets
+import shlex
 import shutil
 import signal
 import socket
@@ -51,6 +52,23 @@ def env_first(*names: str) -> str | None:
         if value:
             return value
     return None
+
+
+def tunnel_command() -> str:
+    override = os.environ.get("FRP_TUNNEL_COMMAND")
+    if override:
+        return override
+    return "frp-dev-tunnel.cmd" if platform.system() == "Windows" else "frp-dev-tunnel"
+
+
+def shell_quote(value: str) -> str:
+    if platform.system() == "Windows":
+        return subprocess.list2cmdline([value])
+    return shlex.quote(value)
+
+
+def command_example(*parts: str) -> str:
+    return " ".join([shell_quote(tunnel_command()), *parts])
 
 
 def config_path() -> Path:
@@ -333,10 +351,12 @@ def ensure_config(config: dict[str, Any], allow_prompt: bool) -> dict[str, Any]:
 
     if not allow_prompt or not sys.stdin.isatty():
         config_cmd = (
-            "scripts/frp-dev-tunnel.sh config "
-            "--server-addr <frps-domain-or-ip> "
-            "--server-port <frps-port> "
-            "--token <frps-token>"
+            command_example(
+                "config "
+                "--server-addr <frps-domain-or-ip> "
+                "--server-port <frps-port> "
+                "--token <frps-token>"
+            )
         )
         die(
             "缺少 FRPS 连接信息。请先运行交互配置，或设置环境变量 "
@@ -379,7 +399,7 @@ def redacted_config(config: dict[str, Any]) -> dict[str, Any]:
 
 
 def public_scheme(config: dict[str, Any]) -> str:
-    return str(config.get("public_scheme") or "https")
+    return str(config.get("public_scheme") or "http")
 
 
 def toml_quote(value: str) -> str:
@@ -576,17 +596,17 @@ def choose_runner(requested: str | None = None) -> str:
         die("FRP_RUNNER 只能是 auto、local 或 docker")
     if runner == "local":
         if not frpc_binary():
-            die("未找到 frpc；请运行 scripts/frp-dev-tunnel.sh install-frpc，或在已有 Docker 时使用 FRP_RUNNER=docker")
+            die(f"未找到 frpc；请运行 {command_example('install-frpc')}，或在已有 Docker 时使用 FRP_RUNNER=docker")
         return "local"
     if runner == "docker":
         if not docker_base_command():
-            die("Docker 不可用。请不要为了此 skill 安装 Docker；运行 scripts/frp-dev-tunnel.sh install-frpc 后使用本地 frpc")
+            die(f"Docker 不可用。请不要为了此 skill 安装 Docker；运行 {command_example('install-frpc')} 后使用本地 frpc")
         return "docker"
     if frpc_binary():
         return "local"
     if docker_base_command():
         return "docker"
-    die("未找到 frpc，也没有可复用的 Docker。请运行 scripts/frp-dev-tunnel.sh install-frpc 安装轻量 frpc 客户端")
+    die(f"未找到 frpc，也没有可复用的 Docker。请运行 {command_example('install-frpc')} 安装轻量 frpc 客户端")
 
 
 def normalize_arch(raw: str) -> str:
@@ -700,9 +720,9 @@ def bootstrap_client(args: argparse.Namespace) -> None:
     print("")
     print("Next:")
     print("  1. Validate the tunnel with the tiny smoke project:")
-    print("     scripts/frp-dev-tunnel.sh smoke-test")
+    print(f"     {command_example('smoke-test')}")
     print("  2. If smoke-test works, start your real dev server on a known port.")
-    print(f"  3. Run: scripts/frp-dev-tunnel.sh start-auto {args.prefix} <local-port>")
+    print(f"  3. Run: {command_example('start-auto', args.prefix, '<local-port>')}")
 
 
 def check_environment(_: argparse.Namespace) -> None:
@@ -737,7 +757,7 @@ def check_environment(_: argparse.Namespace) -> None:
     elif docker:
         print("OK Docker: 已存在，可作为临时 frpc 运行器")
         warnings.append("未找到本地 frpc；Docker 只作为已有环境的兼容 fallback，不建议为了此 skill 安装 Docker")
-        warnings.append("更轻量的本地路径: scripts/frp-dev-tunnel.sh install-frpc")
+        warnings.append(f"更轻量的本地路径: {command_example('install-frpc')}")
     else:
         failures.append("未找到 frpc，也没有可复用的 Docker；请安装轻量 frpc 客户端，不要为了此 skill 安装 Docker")
 
@@ -761,13 +781,13 @@ def check_environment(_: argparse.Namespace) -> None:
 
     if not frpc and not docker:
         print("\nInstall frpc:")
-        print("  scripts/frp-dev-tunnel.sh install-frpc")
+        print(f"  {command_example('install-frpc')}")
 
     if missing:
         print("\nConfigure FRPS:")
-        print("  scripts/frp-dev-tunnel.sh config")
+        print(f"  {command_example('config')}")
         print("  # 无交互环境可用:")
-        print("  scripts/frp-dev-tunnel.sh config --server-addr <frps-domain-or-ip> --server-port <frps-port> --token <frps-token>")
+        print(f"  {command_example('config --server-addr <frps-domain-or-ip> --server-port <frps-port> --token <frps-token>')}")
 
     if failures:
         print("\nFailures:")
@@ -1045,8 +1065,8 @@ def smoke_test(args: argparse.Namespace) -> None:
     print("")
     print("If the smoke page works, use this skill in any other project:")
     print("  1. Start that project's dev server on a known local port.")
-    print("  2. Run: scripts/frp-dev-tunnel.sh start-auto <project-name> <local-port>")
-    print(f"  3. Stop this smoke test when done: scripts/frp-dev-tunnel.sh stop {subdomain}")
+    print(f"  2. Run: {command_example('start-auto <project-name> <local-port>')}")
+    print(f"  3. Stop this smoke test when done: {command_example('stop', subdomain)}")
 
 
 def stop_local_pid(pid: int) -> None:
@@ -1133,7 +1153,7 @@ def print_verify_hint(status: int, body: str, config: dict[str, Any]) -> None:
         domain = config.get("public_domain") or "<public-domain>"
         print("")
         print("Hint: the request reached the local dev server, but the Host header was rejected.")
-        print("For Vite, add a narrow allowedHosts rule, for example:")
+        print("For Vite, ask before changing the project, then add a narrow allowedHosts rule, for example:")
         print(f"  server: {{ allowedHosts: ['.{domain}'] }}")
     elif status in {502, 503, 504}:
         print("")

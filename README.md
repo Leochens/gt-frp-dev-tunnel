@@ -82,7 +82,8 @@ The local Agent should first check whether `gt-frp-dev-tunnel` is installed as a
 
 - If it is already installed, reinstall or refresh it from this repository.
 - If it is not installed, install it first.
-- If the platform does not support skills, use the helper script path below.
+- If the platform does not support skills, use the bootstrap command below.
+- Do not copy helper scripts or FRP config into the user's project, and do not commit tunnel helper files to the project repository.
 
 The prompt gives the local Agent a single bootstrap command like:
 
@@ -90,15 +91,17 @@ The prompt gives the local Agent a single bootstrap command like:
 curl -fsSL https://raw.githubusercontent.com/Leochens/gt-frp-dev-tunnel/main/scripts/frp-client-bootstrap.sh | bash -s -- --server-addr tunnel.example.com --server-port 7111 --token '<token>' --public-domain tunnel.example.com --public-scheme http
 ```
 
-That command downloads the helper into the current project, writes the local FRP config, installs the lightweight `frpc` client if missing, and runs `doctor`. It does not write the token into git-tracked project files.
+That command installs the helper into the user's OS-level data directory, writes FRP config into the user's OS-level config directory, installs the lightweight `frpc` client if missing, and runs `doctor`. It should not create or modify files in the current project.
+
+The examples below use `frp-dev-tunnel`; if bootstrap prints a full `Tunnel command` path, use that exact path instead.
 
 After bootstrap, validate with the tiny smoke project before exposing a real app:
 
 ```bash
-scripts/frp-dev-tunnel.sh smoke-test
+frp-dev-tunnel smoke-test
 ```
 
-The smoke test creates a minimal static page, exposes it through frp, and prints a public URL plus cleanup command. Once that works, run the same helper in any real project by starting the project's dev server and then running `scripts/frp-dev-tunnel.sh start-auto <project-name> <local-port>`.
+The smoke test creates a minimal static page outside the project, exposes it through frp, and prints a public URL plus cleanup command. Once that works, run the same helper in any real project by starting the project's dev server and then running `frp-dev-tunnel start-auto <project-name> <local-port>`.
 
 The same prompt is saved on the server at:
 
@@ -111,18 +114,18 @@ The same prompt is saved on the server at:
 On the local development machine, the bootstrap command is preferred. If you already installed or cloned this repository:
 
 ```bash
-scripts/frp-dev-tunnel.sh config \
+frp-dev-tunnel config \
   --server-addr <frps-domain-or-ip> \
   --server-port <frps-port> \
   --token '<frps-token>' \
   --public-domain <wildcard-domain> \
   --public-scheme <http-or-https>
-scripts/frp-dev-tunnel.sh doctor
-scripts/frp-dev-tunnel.sh smoke-test
-scripts/frp-dev-tunnel.sh start-auto demo 5173
+frp-dev-tunnel doctor
+frp-dev-tunnel smoke-test
+frp-dev-tunnel start-auto demo 5173
 ```
 
-If external Vite access returns a 403 mentioning `allowedHosts` or blocked Host, allow the wildcard host in the target project's Vite config and restart the dev server:
+If external Vite access returns a 403 mentioning `allowedHosts` or blocked Host, the tunnel is reaching the local dev server. Ask before changing the target project, then allow the wildcard host in the target project's Vite config and restart the dev server:
 
 ```ts
 server: {
@@ -133,5 +136,5 @@ server: {
 Stop a tunnel:
 
 ```bash
-scripts/frp-dev-tunnel.sh stop <subdomain>
+frp-dev-tunnel stop <subdomain>
 ```
