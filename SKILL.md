@@ -47,7 +47,11 @@ curl -fsSL https://raw.githubusercontent.com/Leochens/gt-frp-dev-tunnel/main/scr
 
 The server script:
 
-- Installs `frps` and writes `/etc/frp/frps.toml`.
+- Writes `/etc/frp/frps.toml`.
+- Automatically detects Docker and runs `frps` as a container when Docker is available.
+- Falls back to installing the `frps` binary and registering a systemd service when Docker is unavailable.
+- Supports `--runtime auto|docker|systemd` for explicit runtime control.
+- Uses `snowdreamtech/frps:<frp-version>` in Docker mode unless `--frps-image` is provided.
 - Generates or accepts the `auth.token`.
 - Lets the user choose the frps client connection port; the default is `7111`.
 - Defaults `vhostHTTPPort` to `80` and `vhostHTTPSPort` to `443`.

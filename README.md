@@ -40,7 +40,21 @@ For production-like usage, prefer a tagged release URL instead of `main` after t
 curl -fsSL https://raw.githubusercontent.com/Leochens/gt-frp-dev-tunnel/v0.1.0/scripts/frps-server-setup.sh | sudo bash -s -- setup --domain tunnel.example.com
 ```
 
-The server script installs `frps`, writes a systemd service, guides wildcard DNS setup, handles 80/443 conflicts with Nginx/OpenResty/Apache when possible, and prints a client-side prompt.
+The server script installs/configures `frps`, guides wildcard DNS setup, handles 80/443 conflicts with Nginx/OpenResty/Apache when possible, and prints a client-side prompt.
+
+By default, the server runtime is `auto`:
+
+- If Docker is installed and the daemon is available, `frps` runs as a container named `gt-frp-frps`.
+- If Docker is unavailable, the script falls back to downloading the `frps` binary and registering a systemd service.
+
+Force a runtime when needed:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Leochens/gt-frp-dev-tunnel/main/scripts/frps-server-setup.sh | sudo bash -s -- setup --domain tunnel.example.com --runtime docker
+curl -fsSL https://raw.githubusercontent.com/Leochens/gt-frp-dev-tunnel/main/scripts/frps-server-setup.sh | sudo bash -s -- setup --domain tunnel.example.com --runtime systemd
+```
+
+Docker mode uses `snowdreamtech/frps:<frp-version>` by default. Override with `--frps-image <image>` if your server needs a mirror or private registry.
 
 ## Firewall And Port Check
 

@@ -11,6 +11,7 @@ CONFIG_DIR="/etc/frp"
 FRPS_CONFIG="${CONFIG_DIR}/frps.toml"
 SERVICE_FILE="/etc/systemd/system/frps.service"
 CLIENT_PROMPT_FILE="/root/gt-frp-dev-tunnel-client-prompt.txt"
+DOCKER_CONTAINER_NAME="gt-frp-frps"
 
 COMMAND="setup"
 DOMAIN=""
@@ -20,6 +21,8 @@ CHECK_HOST=""
 CHECK_PORT=""
 AUTH_TOKEN=""
 FRP_VERSION="${DEFAULT_FRP_VERSION}"
+RUNTIME="auto"
+FRPS_IMAGE=""
 VHOST_HTTP_PORT="80"
 VHOST_HTTPS_PORT="443"
 INTERNAL_HTTP_PORT="18080"
@@ -47,6 +50,9 @@ Options:
   --server-port <port>           FRPS bind/client port. Default: 7111.
   --token <token|auto>           FRPS auth token. Default: auto.
   --frp-version <version>        frp release version. Default: 0.67.0.
+  --runtime <auto|docker|systemd>
+                                  Default: auto. Use Docker when available.
+  --frps-image <image>           Docker image for frps. Default: snowdreamtech/frps:<version>.
   --vhost-http-port <port>       Desired frps HTTP vhost port. Default: 80.
   --vhost-https-port <port>      Desired frps HTTPS vhost port. Default: 443.
   --internal-http-port <port>    First fallback HTTP vhost port behind a gateway. Default: 18080.
@@ -85,6 +91,41 @@ require_root() {
 
 have() {
   command -v "$1" >/dev/null 2>&1
+}
+
+docker_available() {
+  have docker || return 1
+  docker info >/dev/null 2>&1
+}
+
+frps_image() {
+  if [[ -n "${FRPS_IMAGE}" ]]; then
+    printf '%s' "${FRPS_IMAGE}"
+  else
+    printf 'snowdreamtech/frps:%s' "${FRP_VERSION}"
+  fi
+}
+
+choose_runtime() {
+  case "${RUNTIME}" in
+    auto)
+      if docker_available; then
+        printf 'docker'
+      else
+        printf 'systemd'
+      fi
+      ;;
+    docker)
+      [[ "${DRY_RUN}" == "1" ]] || docker_available || fail "Docker 不可用；请先安装/启动 Docker，或使用 --runtime systemd"
+      printf 'docker'
+      ;;
+    systemd)
+      printf 'systemd'
+      ;;
+    *)
+      fail "--runtime 只能是 auto、docker 或 systemd"
+      ;;
+  esac
 }
 
 run_cmd() {
@@ -214,6 +255,14 @@ parse_args() {
         ;;
       --frp-version)
         FRP_VERSION="${2:-}"
+        shift 2
+        ;;
+      --runtime)
+        RUNTIME="${2:-}"
+        shift 2
+        ;;
+      --frps-image)
+        FRPS_IMAGE="${2:-}"
         shift 2
         ;;
       --vhost-http-port)
@@ -614,6 +663,46 @@ EOF
   fi
 }
 
+managed_systemd_service() {
+  [[ -f "${SERVICE_FILE}" ]] && grep -q "${APP_NAME}" "${SERVICE_FILE}"
+}
+
+stop_managed_systemd_service() {
+  if have systemctl && managed_systemd_service; then
+    run_cmd systemctl disable --now frps || warn "无法停止已有 frps.service，请手动检查端口占用"
+  fi
+}
+
+stop_managed_docker_container() {
+  if docker_available; then
+    run_cmd docker rm -f "${DOCKER_CONTAINER_NAME}" >/dev/null 2>&1 || true
+  elif [[ "${DRY_RUN}" == "1" ]]; then
+    run_cmd docker rm -f "${DOCKER_CONTAINER_NAME}" >/dev/null 2>&1 || true
+  fi
+}
+
+start_docker_frps() {
+  local image
+  image="$(frps_image)"
+  stop_managed_systemd_service
+  stop_managed_docker_container
+  log "使用 Docker 运行 frps: ${image}"
+  run_cmd docker run -d \
+    --name "${DOCKER_CONTAINER_NAME}" \
+    --restart unless-stopped \
+    --network host \
+    -v "${FRPS_CONFIG}:${FRPS_CONFIG}:ro" \
+    --entrypoint /usr/bin/frps \
+    "${image}" \
+    -c "${FRPS_CONFIG}"
+}
+
+start_systemd_frps() {
+  stop_managed_docker_container
+  install_frps
+  write_systemd_service
+}
+
 print_dns_guide() {
   local ip
   ip="$(public_ip)"
@@ -736,6 +825,7 @@ preflight_prompts() {
 
   [[ "${PUBLIC_SCHEME}" == "http" || "${PUBLIC_SCHEME}" == "https" ]] || fail "--public-scheme 只能是 http 或 https"
   [[ "${GATEWAY}" =~ ^(auto|none|nginx|openresty|apache|manual)$ ]] || fail "--gateway 参数不正确"
+  [[ "${RUNTIME}" =~ ^(auto|docker|systemd)$ ]] || fail "--runtime 只能是 auto、docker 或 systemd"
   validate_port "${SERVER_PORT}" "server-port"
   validate_port "${VHOST_HTTP_PORT}" "vhost-http-port"
   validate_port "${VHOST_HTTPS_PORT}" "vhost-https-port"
@@ -749,6 +839,7 @@ preflight_prompts() {
   log "  公共泛域名: *.${DOMAIN}"
   log "  frps vhost 默认端口: HTTP ${VHOST_HTTP_PORT}, HTTPS ${VHOST_HTTPS_PORT}"
   log "  端口冲突时网关处理: ${GATEWAY}"
+  log "  frps 运行方式: ${RUNTIME}（auto 会优先使用可用 Docker）"
   log "  客户端公开 URL scheme: ${PUBLIC_SCHEME}"
 
   if [[ "${ASSUME_YES}" != "1" && "${DRY_RUN}" != "1" && -t 0 ]]; then
@@ -761,6 +852,9 @@ preflight_prompts() {
 setup() {
   require_root
   preflight_prompts
+  local selected_runtime
+  selected_runtime="$(choose_runtime)"
+  log "实际 frps 运行方式: ${selected_runtime}"
 
   if port_busy "${SERVER_PORT}"; then
     local bind_text
@@ -786,9 +880,12 @@ setup() {
     warn "检测到 ${VHOST_HTTP_PORT}/${VHOST_HTTPS_PORT} 端口冲突，frps vhost 将改用内部端口 ${effective_http_port}/${effective_https_port}"
   fi
 
-  install_frps
   write_frps_config "${effective_http_port}" "${effective_https_port}"
-  write_systemd_service
+  if [[ "${selected_runtime}" == "docker" ]]; then
+    start_docker_frps
+  else
+    start_systemd_frps
+  fi
 
   if [[ "${http_busy}" == "1" || "${https_busy}" == "1" ]]; then
     case "${gateway_kind}" in
@@ -815,7 +912,10 @@ setup() {
   print_firewall_guide
   write_client_prompt
 
-  if have systemctl && [[ "${DRY_RUN}" != "1" ]]; then
+  if [[ "${selected_runtime}" == "docker" && "${DRY_RUN}" != "1" ]]; then
+    log "frps 容器状态："
+    docker ps --filter "name=^/${DOCKER_CONTAINER_NAME}$" --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" || true
+  elif have systemctl && [[ "${DRY_RUN}" != "1" ]]; then
     log "frps 服务状态："
     systemctl --no-pager --full status frps || true
   fi
@@ -823,6 +923,12 @@ setup() {
 
 doctor() {
   log "System: $(uname -a)"
+  if docker_available; then
+    log "Docker: available"
+    docker ps -a --filter "name=^/${DOCKER_CONTAINER_NAME}$" --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" || true
+  else
+    log "Docker: unavailable"
+  fi
   log "frps binary: $([[ -x "${FRPS_BIN}" ]] && printf '%s' "${FRPS_BIN}" || printf 'missing')"
   log "frps config: $([[ -f "${FRPS_CONFIG}" ]] && printf '%s' "${FRPS_CONFIG}" || printf 'missing')"
   if have systemctl; then
