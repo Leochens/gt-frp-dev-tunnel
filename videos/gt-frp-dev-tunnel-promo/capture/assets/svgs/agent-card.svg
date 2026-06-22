@@ -1,15 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 660" role="img" aria-label="Agent handoff prompt card">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 660" role="img" aria-label="Agent 交接提示卡片">
   <rect width="1040" height="660" rx="34" fill="#0E1A20" stroke="#263943" stroke-width="4"/>
-  <text x="64" y="88" font-family="Inter, Avenir Next, Helvetica, Arial, sans-serif" font-size="44" font-weight="800" fill="#F4FAFC">Agent handoff</text>
-  <text x="64" y="134" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="24" fill="#9CB3BD">copy the bootstrap prompt once</text>
+  <text x="64" y="88" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="44" font-weight="800" fill="#F4FAFC">Agent 交接</text>
+  <text x="64" y="134" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="24" fill="#9CB3BD">复制一次启动提示即可</text>
   <rect x="64" y="184" width="912" height="94" rx="22" fill="#071014" stroke="#263943"/>
   <text x="96" y="242" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="28" fill="#FFB86B">$ bootstrap --server-addr tunnel.example.com</text>
   <rect x="64" y="314" width="278" height="110" rx="20" fill="#071014" stroke="#4DE3FF"/>
   <rect x="382" y="314" width="278" height="110" rx="20" fill="#071014" stroke="#4DE3FF"/>
   <rect x="700" y="314" width="278" height="110" rx="20" fill="#071014" stroke="#4DE3FF"/>
-  <text x="102" y="378" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="28" fill="#F4FAFC">config</text>
-  <text x="420" y="378" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="28" fill="#F4FAFC">doctor</text>
-  <text x="738" y="378" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="28" fill="#F4FAFC">start-auto</text>
+  <text x="102" y="378" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="28" fill="#F4FAFC">配置</text>
+  <text x="420" y="378" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="28" fill="#F4FAFC">体检</text>
+  <text x="738" y="378" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="28" fill="#F4FAFC">开隧道</text>
   <rect x="64" y="488" width="250" height="64" rx="32" fill="#071014" stroke="#263943"/>
   <rect x="342" y="488" width="250" height="64" rx="32" fill="#071014" stroke="#263943"/>
   <rect x="620" y="488" width="250" height="64" rx="32" fill="#071014" stroke="#263943"/>

@@ -6,11 +6,11 @@
   <circle cx="128" cy="39" r="12" fill="#9AF27A"/>
   <text x="64" y="151" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="34" fill="#FFB86B">$</text>
   <text x="104" y="151" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="34" fill="#F4FAFC">frp-dev-tunnel start-auto demo 5173</text>
-  <text x="64" y="228" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="30" fill="#9CB3BD">local service: 127.0.0.1:5173</text>
-  <text x="64" y="292" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="30" fill="#4DE3FF">public URL: http://demo.tunnel.example.com</text>
-  <text x="64" y="356" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="30" fill="#9AF27A">status: HTTP 200 OK</text>
-  <text x="64" y="452" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="26" fill="#9CB3BD">verify current: frp-dev-tunnel verify demo</text>
-  <text x="64" y="504" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="26" fill="#9CB3BD">stop cleanly: frp-dev-tunnel stop demo</text>
+  <text x="64" y="228" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="30" fill="#9CB3BD">本地服务：127.0.0.1:5173</text>
+  <text x="64" y="292" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="30" fill="#4DE3FF">公网链接：http://demo.tunnel.example.com</text>
+  <text x="64" y="356" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="30" fill="#9AF27A">状态：HTTP 200 OK</text>
+  <text x="64" y="452" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="26" fill="#9CB3BD">验证当前：frp-dev-tunnel verify demo</text>
+  <text x="64" y="504" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="26" fill="#9CB3BD">干净停止：frp-dev-tunnel stop demo</text>
   <rect x="64" y="552" width="290" height="42" rx="21" fill="#071014" stroke="#263943"/>
-  <text x="90" y="581" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="22" fill="#9AF27A">no project files added</text>
+  <text x="90" y="581" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="22" fill="#9AF27A">不写入项目文件</text>
 </svg>
