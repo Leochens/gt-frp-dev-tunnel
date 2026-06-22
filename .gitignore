@@ -1,0 +1,59 @@
+# OS and editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+frpc.toml
+frps.toml
+config.local.json
+
+# Runtime output
+*.log
+*.pid
+*.tmp
+*.temp
+.cache/
+tmp/
+temp/
+logs/
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Node and package-manager caches
+node_modules/
+dist/
+build/
+coverage/
+.turbo/
+.next/
+
+# Local tunnel helper installs and generated state
+.frp-dev-tunnel/
+gt-frp-dev-tunnel-client-prompt.txt
+
+# Video generation scratch output
+videos/**/.thumbnails/
+videos/**/.waveform-cache/
+videos/**/.hyperframes/
+videos/**/renders/
+videos/**/exports/
