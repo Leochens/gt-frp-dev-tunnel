@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 220" role="img" aria-label="GT FRP Dev Tunnel">
+  <defs>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.30 0 0 0 0 0.89 0 0 0 0 1 0 0 0 0.75 0"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect x="16" y="16" width="188" height="188" rx="30" fill="#071014" stroke="#263943" stroke-width="5"/>
+  <path d="M55 146 C98 66 137 66 178 92" fill="none" stroke="#4DE3FF" stroke-width="12" stroke-linecap="round" filter="url(#glow)"/>
+  <circle cx="55" cy="146" r="16" fill="#FFB86B"/>
+  <circle cx="178" cy="92" r="18" fill="#9AF27A"/>
+  <path d="M171 92 l8 8 l18 -24" fill="none" stroke="#071014" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="240" y="94" font-family="Inter, Avenir Next, Helvetica, Arial, sans-serif" font-size="54" font-weight="800" fill="#F4FAFC">GT FRP</text>
+  <text x="240" y="148" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="30" font-weight="700" fill="#4DE3FF">Dev Tunnel</text>
+  <text x="240" y="184" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="20" fill="#9CB3BD">localhost -> public URL</text>
+</svg>

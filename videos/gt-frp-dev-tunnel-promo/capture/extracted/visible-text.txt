@@ -1,0 +1,12 @@
+[h1] GT FRP Dev Tunnel
+[p] Expose a local development server through your own frps server and a wildcard subdomain.
+[h2] Server One-Line Setup
+[code] curl -fsSL https://raw.githubusercontent.com/Leochens/gt-frp-dev-tunnel/main/scripts/frps-server-setup.sh | sudo bash -s -- setup
+[h2] Client Agent Handoff
+[p] The local Agent should check whether gt-frp-dev-tunnel is installed as a skill/plugin/connector.
+[code] frp-dev-tunnel smoke-test
+[code] frp-dev-tunnel start-auto demo 5173
+[h2] Recommended final output for agents
+[p] Public URL, HTTP status, local service, tunnel name, and management commands.
+[h2] No project clutter
+[p] Do not copy helper scripts or FRP config into the user's project, and do not commit tunnel helper files.

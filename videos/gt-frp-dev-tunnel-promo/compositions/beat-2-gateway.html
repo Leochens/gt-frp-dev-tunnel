@@ -1,0 +1,136 @@
+<template id="beat-2-gateway-template">
+  <div id="beat-2-gateway" data-composition-id="beat-2-gateway" data-start="0" data-duration="5.1" data-width="1920" data-height="1080">
+    <div class="bg"></div>
+    <main class="scene">
+      <section class="left">
+        <p class="eyebrow">one VPS, reusable gateway</p>
+        <h2>Turn your own VPS into the tunnel hub.</h2>
+        <div class="metrics">
+          <div><strong id="count-a">0</strong><span>server setup</span></div>
+          <div><strong id="count-b">0</strong><span>wildcard domain</span></div>
+          <div><strong id="count-c">0</strong><span>client port</span></div>
+        </div>
+      </section>
+      <section class="map-stage">
+        <img class="map" src="capture/assets/svgs/network-map.svg" alt="Reusable VPS gateway topology" />
+        <svg class="route-draw" viewBox="0 0 1120 640" aria-hidden="true">
+          <path id="draw-route" d="M216 320 C350 210 450 210 560 320 C690 456 810 446 936 304" />
+        </svg>
+      </section>
+    </main>
+    <style>
+      #beat-2-gateway {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #071014;
+        color: #f4fafc;
+        font-family: Inter, "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+      }
+      .bg {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(circle at 62% 48%, rgba(77, 227, 255, 0.17), transparent 30%),
+          radial-gradient(circle at 15% 18%, rgba(255, 184, 107, 0.12), transparent 25%),
+          #071014;
+      }
+      .scene {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        box-sizing: border-box;
+        padding: 108px 112px;
+        display: grid;
+        grid-template-columns: minmax(0, 0.74fr) minmax(0, 1.26fr);
+        gap: 72px;
+        align-items: center;
+      }
+      .eyebrow {
+        font-family: monospace;
+        font-size: 26px;
+        color: #ffb86b;
+        margin: 0 0 28px;
+      }
+      h2 {
+        margin: 0;
+        font-size: 78px;
+        line-height: 1.02;
+        letter-spacing: 0;
+        max-width: 680px;
+      }
+      .metrics {
+        margin-top: 64px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+      }
+      .metrics div {
+        background: #0e1a20;
+        border: 1px solid #263943;
+        border-radius: 18px;
+        padding: 22px;
+      }
+      .metrics strong {
+        display: block;
+        color: #9af27a;
+        font-family: monospace;
+        font-size: 40px;
+      }
+      .metrics span {
+        display: block;
+        margin-top: 8px;
+        color: #9cb3bd;
+        font-family: monospace;
+        font-size: 18px;
+      }
+      .map-stage {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        perspective: 1200px;
+      }
+      .map {
+        width: 100%;
+        max-width: 1060px;
+        filter: drop-shadow(0 48px 84px rgba(0, 0, 0, 0.42));
+      }
+      .route-draw {
+        position: absolute;
+        width: 100%;
+        max-width: 1060px;
+        pointer-events: none;
+      }
+      #draw-route {
+        fill: none;
+        stroke: #9af27a;
+        stroke-width: 16;
+        stroke-linecap: round;
+        stroke-dasharray: 920;
+        stroke-dashoffset: 920;
+        filter: drop-shadow(0 0 14px #9af27a);
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      var proxy = { a: 0, b: 0, c: 0 };
+      function updateCounts() {
+        document.getElementById("count-a").textContent = Math.round(proxy.a) + "x";
+        document.getElementById("count-b").textContent = Math.round(proxy.b) + "x";
+        document.getElementById("count-c").textContent = Math.round(proxy.c);
+      }
+      tl.fromTo(".eyebrow", { opacity: 0, x: -42 }, { opacity: 1, x: 0, duration: 0.48, ease: "power3.out" }, 0.2);
+      tl.fromTo("h2", { opacity: 0, y: 58 }, { opacity: 1, y: 0, duration: 0.72, ease: "expo.out" }, 0.42);
+      tl.fromTo(".metrics div", { opacity: 0, y: 54, scale: 0.94 }, { opacity: 1, y: 0, scale: 1, stagger: 0.12, duration: 0.54, ease: "back.out(1.35)" }, 1.04);
+      tl.fromTo(".map-stage", { opacity: 0, x: 120, rotationY: -10, scale: 0.92 }, { opacity: 1, x: 0, rotationY: -5, scale: 1, duration: 0.9, ease: "power4.out" }, 0.3);
+      tl.to("#draw-route", { strokeDashoffset: 0, duration: 1.45, ease: "power2.out" }, 1.2);
+      tl.to(proxy, { a: 1, b: 1, c: 7111, duration: 1.5, ease: "power2.out", onUpdate: updateCounts }, 1.24);
+      tl.to(".map", { scale: 1.035, duration: 4.3, ease: "sine.inOut" }, 0.6);
+      window.__timelines["beat-2-gateway"] = tl;
+    </script>
+  </div>
+</template>

@@ -1,0 +1,129 @@
+<template id="beat-4-verified-template">
+  <div id="beat-4-verified" data-composition-id="beat-4-verified" data-start="0" data-duration="4.9" data-width="1920" data-height="1080">
+    <div class="bg"></div>
+    <main class="scene">
+      <section class="payoff">
+        <img class="logo" src="capture/assets/svgs/logo.svg" alt="GT FRP Dev Tunnel" />
+        <div class="url-badge">http://demo.tunnel.example.com</div>
+        <h2>No deploy. Just your dev server, online.</h2>
+        <div class="status-rail">
+          <div><span></span>HTTP 200 OK</div>
+          <div><span></span>local service: 127.0.0.1:5173</div>
+          <div><span></span>tunnel name: demo</div>
+          <div><span></span>cleanup: stop-all</div>
+        </div>
+      </section>
+      <section class="phone-stage">
+        <img class="phone" src="capture/assets/svgs/phone-check.svg" alt="Phone public URL verification" />
+      </section>
+    </main>
+    <style>
+      #beat-4-verified {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #071014;
+        color: #f4fafc;
+        font-family: Inter, "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+      }
+      .bg {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(circle at 72% 52%, rgba(154, 242, 122, 0.18), transparent 28%),
+          radial-gradient(circle at 25% 18%, rgba(77, 227, 255, 0.16), transparent 28%),
+          #071014;
+      }
+      .scene {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        height: 100%;
+        box-sizing: border-box;
+        padding: 76px 112px 96px;
+        display: grid;
+        grid-template-columns: minmax(0, 1.06fr) minmax(0, 0.94fr);
+        gap: 78px;
+        align-items: center;
+      }
+      .logo {
+        width: 350px;
+        height: auto;
+        margin-bottom: 48px;
+      }
+      .url-badge {
+        display: inline-flex;
+        max-width: 100%;
+        box-sizing: border-box;
+        font-family: monospace;
+        font-size: 34px;
+        color: #4de3ff;
+        border: 2px solid #4de3ff;
+        border-radius: 24px;
+        padding: 22px 30px;
+        background: #0e1a20;
+        box-shadow: 0 0 34px rgba(77, 227, 255, 0.2);
+      }
+      h2 {
+        margin: 46px 0 0;
+        font-size: 84px;
+        line-height: 1.0;
+        letter-spacing: 0;
+        max-width: 900px;
+      }
+      .status-rail {
+        margin-top: 52px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+      .status-rail div {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        font-family: monospace;
+        font-size: 23px;
+        color: #f4fafc;
+        background: #0e1a20;
+        border: 1px solid #263943;
+        border-radius: 18px;
+        padding: 18px 20px;
+      }
+      .status-rail span {
+        width: 18px;
+        height: 18px;
+        border-radius: 999px;
+        background: #9af27a;
+        box-shadow: 0 0 18px #9af27a;
+        flex: 0 0 auto;
+      }
+      .phone-stage {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 840px;
+      }
+      .phone {
+        height: 760px;
+        width: auto;
+        filter: drop-shadow(0 46px 78px rgba(0, 0, 0, 0.5));
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+      tl.fromTo(".phone", { opacity: 0, x: 100, scale: 0.86, rotation: 3 }, { opacity: 1, x: 0, scale: 1, rotation: 0, duration: 0.78, ease: "power4.out" }, 0.12);
+      tl.fromTo(".logo", { opacity: 0, y: -28, scale: 0.94 }, { opacity: 1, y: 0, scale: 1, duration: 0.48, ease: "power3.out" }, 0.22);
+      tl.fromTo(".url-badge", { opacity: 0, y: 38, scale: 0.92 }, { opacity: 1, y: 0, scale: 1, duration: 0.56, ease: "back.out(1.5)" }, 0.58);
+      tl.fromTo("h2", { opacity: 0, y: 68 }, { opacity: 1, y: 0, duration: 0.68, ease: "expo.out" }, 1.04);
+      tl.fromTo(".status-rail div", { opacity: 0, y: 38 }, { opacity: 1, y: 0, stagger: 0.12, duration: 0.46, ease: "power2.out" }, 1.52);
+      tl.to(".status-rail span", { scale: 1.24, duration: 0.42, yoyo: true, repeat: 4, stagger: 0.1, ease: "sine.inOut" }, 2.1);
+      tl.to(".phone", { y: -16, duration: 1.4, yoyo: true, repeat: 2, ease: "sine.inOut" }, 1.2);
+      tl.to(".payoff", { opacity: 0, duration: 0.45, ease: "power2.in" }, 4.45);
+      tl.to(".phone-stage", { opacity: 0, duration: 0.45, ease: "power2.in" }, 4.45);
+      window.__timelines["beat-4-verified"] = tl;
+    </script>
+  </div>
+</template>
