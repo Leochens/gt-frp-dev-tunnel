@@ -1,3 +1,7 @@
+<p align="right">
+  English | <a href="./README.zh-CN.md">简体中文</a>
+</p>
+
 # GT FRP Dev Tunnel
 
 Expose a local development server through your own `frps` gateway and a wildcard
