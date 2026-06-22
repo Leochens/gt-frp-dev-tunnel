@@ -9,7 +9,7 @@ and this project follows semantic versioning after the first tagged release.
 
 ### Added
 
-- Tencent Cloud sponsored server link notice in both README files.
+- Recommended dedicated FRP server notice with Tencent Cloud referral link.
 - Simplified Chinese README and top-level language switch links.
 - Public README with server setup, client bootstrap, security notes, and agent
   output guidance.

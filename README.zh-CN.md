@@ -2,7 +2,7 @@
   <a href="./README.md">English</a> | 简体中文
 </p>
 
-> 须知：你可以直接使用本项目和任意兼容的 VPS；如果需要购买服务器来部署 FRP，也可以通过腾讯云赞助/推广链接购买：<https://curl.qcloud.com/jqbR5NAv>。
+> 须知：为了让 FRP 链路更稳定，建议单独买一台几十块钱的轻量服务器专门跑 `frps`，不要和业务服务混在一起。你可以通过这个腾讯云链接购买服务器并按本文部署：<https://curl.qcloud.com/jqbR5NAv>。任意兼容 VPS 都能用，但专用 FRP 服务器是更推荐的方式。
 
 # GT FRP Dev Tunnel
 
