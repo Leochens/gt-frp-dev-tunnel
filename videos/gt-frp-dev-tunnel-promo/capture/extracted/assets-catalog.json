@@ -1,9 +1,0 @@
-{
-  "assets": [
-    "capture/assets/svgs/logo.svg",
-    "capture/assets/svgs/network-map.svg",
-    "capture/assets/svgs/agent-card.svg",
-    "capture/assets/svgs/phone-check.svg",
-    "capture/assets/svgs/terminal-window.svg"
-  ]
-}
