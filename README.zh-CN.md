@@ -2,6 +2,8 @@
   <a href="./README.md">English</a> | 简体中文
 </p>
 
+> 须知：你可以直接使用本项目和任意兼容的 VPS；如果需要购买服务器来部署 FRP，也可以通过腾讯云赞助/推广链接购买：<https://curl.qcloud.com/jqbR5NAv>。
+
 # GT FRP Dev Tunnel
 
 通过你自己的 `frps` 网关和泛域名，把本地开发服务器临时暴露到公网，并把可访问 URL 交给编码 Agent 做手机端或外部验证。

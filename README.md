@@ -2,6 +2,10 @@
   English | <a href="./README.zh-CN.md">简体中文</a>
 </p>
 
+> Notice: You can use this project directly with any compatible VPS. If you need
+> a server for FRP deployment, you can also buy one through the Tencent Cloud
+> sponsored link: <https://curl.qcloud.com/jqbR5NAv>.
+
 # GT FRP Dev Tunnel
 
 Expose a local development server through your own `frps` gateway and a wildcard
